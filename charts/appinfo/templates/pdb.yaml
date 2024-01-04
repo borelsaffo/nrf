@@ -1,0 +1,33 @@
+{{- if .Values.global.appinfoServiceEnable }}
+{{- if and (has "policy/v1" .Values.global.k8sResources.pdb.supportedVersions) (.Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget") }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "appinfo.fullname" .}}-v1
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+  annotations:
+    {{- include "annotations.allResources" . }}
+spec:
+  maxUnavailable: {{ template "pdb-max-unavailiable" . }}
+  selector:
+    matchLabels:
+      app: {{ template "appinfo-deployment-name" . }}
+{{- else if and (has "policy/v1beta1" .Values.global.k8sResources.pdb.supportedVersions) (.Capabilities.APIVersions.Has "policy/v1beta1/PodDisruptionBudget") }}
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "appinfo.fullname" .}}-v1beta1
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+  annotations:
+    {{- include "annotations.allResources" . }}
+spec:
+  maxUnavailable: {{ .Values.maxUnavailable }}
+  selector:
+    matchLabels:
+      app: {{ template "appinfo-deployment-name" . }}
+{{- end }}
+{{- end }}

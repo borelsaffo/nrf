@@ -1,0 +1,223 @@
+{{- if $.Values.global.performanceServiceEnable }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    {{- include "annotations.deployments" . }}
+  labels:
+    {{- include "labels.deployments" . }}
+    io.kompose.service: {{ template "perf-info-deployment-name" . }}
+  name: {{ template "perf-info-deployment-name" . }}
+spec:
+  progressDeadlineSeconds: 600
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      io.kompose.service: {{ template "perf-info-deployment-name" . }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: {{ .Values.maxUnavailable }}
+  template:
+    metadata:
+      annotations:
+        {{- include "annotations.deployments" . | indent 4 }}
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: {{ .Values.global.containerPorts.monitoringHttp |quote }}
+        prometheus.io/scrape: "true"
+      labels:
+        {{- include "labels.deployments" . | indent 4 }}
+        io.kompose.service: {{ template "perf-info-deployment-name" . }}
+    spec:
+      terminationGracePeriodSeconds: {{ template "termination-grace-period-seconds" .}}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      containers:
+      - env:
+          - name: METRIC_PREFIX
+            value: {{ .Values.global.metricPrefix | quote }}
+          - name: METRIC_SUFFIX
+            value: {{ .Values.global.metricSuffix | quote }}
+          - name: TAG_SERVICE_NAME
+            value: {{ .Values.tagServiceName | quote }}
+          - name: TAG_NAMESPACE
+            value: {{ .Values.tagNamespace | quote }}
+          - name: TAG_CONTAINER_NAME
+            value: {{ .Values.tagContainerName | quote }}
+          - name: OVERALL_CAPACITY
+            value: {{ .Values.global.capacityConfig.overall | quote }}
+          - name: SVC_CAPACITY
+            value: {{ .Values.global.capacityConfig.serviceLevel | quote }}
+          - name: DEFAULT_CAPACITY
+            value: {{ .Values.global.capacityConfig.default | quote }}
+          - name: COMMON_CFG_CLIENT_ENABLED
+            value: {{ .Values.commonCfgClient.enabled | quote }}
+          - name: COMMON_CFG_SERVER_HOST
+            value: {{ template "perfinfo.service.ConfigServerSvcFullname" .}}
+          - name: COMMON_CFG_SERVER_PORT
+            value: {{ .Values.commonCfgServer.port | quote }}
+          - name: COMMON_CFG_SERVER_POLLING_INTERVAL
+            value: {{ .Values.commonCfgServer.pollingInterval | quote }}
+          - name: CONNECTION_TIMEOUT
+            value: {{ .Values.commonCfgServer.connectionTimeout | quote}}
+          - name: MAX_RETRY_COUNT
+            value: {{ .Values.overloadManager.publishLoadLevel.maxRetryForRemovedService | quote }}
+          - name: OVERLOAD_CALCULATION_INTERVAL
+            value: {{ .Values.overloadManager.calculationInterval | quote}}
+          - name: FORCE_REPORT_INTERVAL
+            value: {{ .Values.overloadManager.publishLoadLevel.forceReportInterval | quote }}
+          - name: REQUEST_TIMEOUT
+            value: {{ .Values.overloadManager.publishLoadLevel.requestTimeout | quote }}
+          - name: COMMONSERVICE_NAME
+            value: {{ .Values.commonServiceName }}
+          - name: ISTIO_SIDECAR_QUIT_URL
+            value: {{ .Values.istioSidecarQuitUrl }}
+          - name: ISTIO_SIDECAR_READY_URL
+            value: {{ .Values.istioSidecarReadyUrl }}
+          - name: RELEASE_VERSION
+            value: {{ template "perfinfo.hook.chartVersion" .}} 
+          - name: LOG_LEVEL_PERFINFO
+            value: {{ .Values.log.level.perfinfo }}
+          - name: OVERLOAD_MANAGER_ENABLED
+            value: {{ .Values.overloadManager.enabled | quote }}
+          - name: DIAM_GW_ENABLED
+            value: {{ .Values.global.diamGatewayEnable | quote }}
+          - name: PROBE_VALIDATION_BYPASS
+            value: {{ .Values.probeValidationByPass.enabled | quote }}
+          - name: NF_TYPE
+            value: {{ .Values.overloadManager.nfType }}
+          - name: IGW_HOST
+            value: {{ template "service.OverloadIngressGatewaySvcFullname" .}}
+          - name: IGW_PORT
+            value: {{ .Values.overloadManager.ingressGatewayPort | quote }}
+          {{- if .Values.global.diamGatewayEnable }}
+          - name: DGW_HOST
+            value: {{ template "service-name-oc-diam-gateway" .}}
+          - name: DGW_PORT
+            value: {{ .Values.overloadManager.diamGatewayPort | quote }}
+          {{- end }}
+          - name: PERF_INFO_SCRAPE_INTERVAL
+            value: {{ .Values.overloadManager.perfInfoScrapeInterval | quote }}
+          - name: IGW_SCRAPE_INTERVAL
+            value: {{ .Values.overloadManager.ingressGatewayScrapeInterval | quote }}
+          - name: IGW_FAILURE_RATE_LENGTH
+            value: {{ .Values.overloadManager.ingressGatewayFailureRateLength | quote }}
+          - name: AJACENT_LEVEL_DURATION
+            value: {{ .Values.overloadManager.ajacentLevelDuration | quote }}
+          - name: LOG_CONFIG_TOPIC_NAME
+            value: "common.logging.overload-manager"
+          - name: MONITORING_PORT
+            value: {{ .Values.global.containerPorts.monitoringHttp | quote }}
+          - name: SIGNALING_PORT
+            value: {{ .Values.global.containerPorts.perfInfoHttp | quote }}
+          - name: APP_SHUTDOWN_GRACE_PERIOD
+            value: {{ include "termination-grace-period-seconds" . | quote }}
+          - name: APP_GRACEFUL_SHUTDOWN_ERROR_CODE
+            value: {{ .Values.gracefulShutdown.defaultErrorCode | quote }}
+          - name: MULTIPLE_IGW_ENABLED
+            value: {{ .Values.global.multipleIgwEnabled | quote }}
+        {{- if .Values.imageTag }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image }}:{{ .Values.imageTag }}"
+        {{- else }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image }}:{{ .Values.global.imageTag }}"
+        {{- end }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        name: {{ template "container.fullname" . }}
+        ports:
+          - name: http-signaling
+            containerPort: {{ .Values.global.containerPorts.perfInfoHttp }}
+            protocol: TCP
+          - name: {{ .Values.global.cncMetricsName }}
+            containerPort: {{ .Values.global.containerPorts.monitoringHttp }}
+            protocol: TCP
+        volumeMounts:
+          - name: config-volume
+            mountPath: /etc/config
+          - mountPath: /tmp
+            name: tmp
+        livenessProbe:
+          httpGet:
+            path: /v1/liveness
+            port: {{ .Values.global.containerPorts.monitoringHttp }}
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/startup
+            port: {{ .Values.global.containerPorts.monitoringHttp }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        {{- if and (ge .Capabilities.KubeVersion.Major "1") (ge .Capabilities.KubeVersion.Minor "20") }}
+        startupProbe:
+          httpGet:
+            path: /actuator/health/startup
+            port: {{ .Values.global.containerPorts.monitoringHttp }}
+            scheme: HTTP
+          initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.startupProbe.successThreshold }}
+          failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+        {{- end }}  
+        resources:
+          limits:
+            {{- if ne (add .Values.global.logStorage .Values.global.crictlStorage)  0 }}
+            ephemeral-storage: {{ .Values.resources.limits.ephemeralStorage | quote }}
+            {{- end }}
+            cpu: {{ .Values.resources.limits.cpu | quote}}
+            memory: {{ .Values.resources.limits.memory | quote}}
+          requests:
+            {{- if ne (add .Values.global.logStorage .Values.global.crictlStorage)  0 }}
+            ephemeral-storage: {{ template "perf-info-ephemeral-storage-request" .}}
+            {{- end }}
+            cpu: {{ .Values.resources.requests.cpu | quote}}
+            memory: {{ .Values.resources.requests.memory | quote}}
+    {{- include "extraContainers" . | nindent 6}}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: perfinfo-config-{{ .Release.Name }}
+            items:
+              - key: dbparam
+                path: db.cfg
+        - emptyDir: {}
+          name: tmp
+    {{- include "extraVolumes" . | nindent 8 }}
+    {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+    {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+    {{- else }}
+    {{- if $.Values.nodeSelectorEnabled }}
+      nodeSelector:
+        {{ $.Values.nodeSelectorKey }}: {{ $.Values.nodeSelectorValue }}
+    {{- end }}
+    {{- end }}
+      serviceAccountName: {{ template "ocnf.service-account-name" . }}
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100 
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: "app.kubernetes.io/name"
+                  operator: In
+                  values:
+                  - {{ template "chart.fullname" .}} 
+              topologyKey: "kubernetes.io/hostname"
+
+      restartPolicy: Always
+      schedulerName: default-scheduler
+{{- end }}

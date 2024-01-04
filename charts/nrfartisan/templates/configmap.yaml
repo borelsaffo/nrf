@@ -1,0 +1,92 @@
+# Copyright 2022 (C), Oracle and/or its affiliates. All rights reserved.
+{{- if $.Values.global.enableNrfArtisanService }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "configmap.fullname" .}}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+data: 
+  APP_NAME: {{ .Values.global.app_name | quote }}
+  VENDOR: {{ .Values.global.vendor | quote }}
+  LOG_LEVEL: {{ .Values.log.level }}
+  LOG_LEVEL_SYSTEM:  {{ .Values.global.systemLoggingLevel }}
+  LOG_LOCATION_INFO: {{ .Values.log.logLocationInfo | quote }}
+  LOG4J2_BURST_RATE: {{ .Values.log.burst.rate | quote }}
+  LOG4J2_BURST_MAX: {{ .Values.log.burst.max | quote }}
+  CONSOLE_FORMAT:  {{ .Values.log.consoleFormat | quote }}
+  MICROSERVICE_NAME: {{ template "service.fullname" . }}
+  ENGINEERING_VERSION: {{.Chart.Version}}
+  MARKETING_VERSION: {{.Chart.AppVersion}}
+  NRF_LEVEL: {{ .Values.global.nrfInstanceId | quote }}
+  MYSQL_PRIMARY_HOST: {{ .Values.global.mysql.primary.host }}
+  MYSQL_SECONDARY_HOST: {{ .Values.global.mysql.secondary.host | quote }}
+  MYSQL_PRIMARY_PORT: {{ .Values.global.mysql.primary.port | quote }}
+  MYSQL_SECONDARY_PORT: {{ .Values.global.mysql.secondary.port | quote }}
+  
+  NRFARTISAN_SERVER_QUEUE_SIZE: {{ .Values.server.queueSize | quote}}
+  NRFARTISAN_SERVER_MAX_THREADS: {{ .Values.server.maxThreads | quote}}
+  NRFARTISAN_SERVER_MAX_CONNECTIONS: {{ .Values.server.maxConnections | quote}}
+  NRFARTISAN_HIKARI_POOL_SIZE: {{ .Values.hikariPoolSize | quote}}
+  NRFARTISAN_HIKARI_CONNECTION_TIMEOUT: {{ .Values.hikariConnectionTimeout | quote }}
+  NRFARTISAN_HIKARI_MINIMUM_IDLE: {{ .Values.hikariMinimumIdle | quote }}
+  NRFARTISAN_HIKARI_IDLE_TIMEOUT: {{ .Values.hikariIdleTimeout | quote }}
+  NRFARTISAN_HIKARI_MAX_LIFETIME: {{ .Values.hikariMaxLifetime | quote }}
+  NRFARTISAN_SERVER_SPARE_THREADS: {{ .Values.server.spareThreads | quote}}
+  NRFARTISAN_SVC_PORT: {{ .Values.global.nrfartisan.portConfiguration.servicePort | quote }}
+  ARS_HOST: {{ template "alternateroute.service.fullname" . }}  
+  ARS_PORT: {{ .Values.global.alternateroute.portConfiguration.servicePort | quote }}    
+  
+  APP_INFO_SERVICE_NAME: {{ template "appinfo.service.fullname" . }}
+  APP_INFO_SERVICE_PORT: {{ .Values.global.servicePorts.appInfoHttp | quote }}
+  
+  #If set to true, replication status shall not be fetched and assumed to be active. Only for Internal Use
+  OVERRIDE_REPLICATION_CHECK: {{ .Values.global.overrideReplicationCheck | quote }}
+
+  DB_MONITOR_SVC_HOST: {{ .Values.global.dbMonitorSvcHost }}
+  DB_MONITOR_SVC_PORT: {{ .Values.global.dbMonitorSvcPort | quote }}
+
+  DATABASE_ENGINE: {{ .Values.global.databaseEngine | quote}}
+  
+  ARTISAN_SVC_SYSTEM_OPTIONS_FETCH_INTERVAL: {{ .Values.systemOptionsFetchInterval | quote}}
+  POPULATE_SLF_DISCOVERED_CANDIDATE_LIST_FETCH_INTERVAL: {{ .Values.slfDiscoveredCandidateListFetchInterval | quote}}
+  DNS_NAPTR_FEATURE_STATUS_FETCH_INTERVAL: {{ .Values.dnsNaptrFeatureStatusFetchInterval | quote}}
+
+  APP_USER_SECRETKEY_NAMESPACE: {{ .Values.global.database.nameSpace }}
+  APP_USER_SECRETKEY_NAME: {{ .Values.global.database.appUserSecretName }} 
+  NRF_INSTANCE_ID: {{ .Values.global.nrfInstanceId | quote }}
+  COMMON_SERVICE_PORT: {{ .Values.global.nrfartisan.portConfiguration.commonServicePort | quote }}
+  CONTAINER_PORT: {{ .Values.global.nrfartisan.portConfiguration.containerPort | quote }}
+
+  CONF_SVC_PORT: {{ .Values.global.nrfconfiguration.portConfiguration.servicePort | quote }}
+  CONF_SVC_HOST: {{ template "configuration.service.fullname" . }}
+
+  PRIVILEGED_USER_SECRETKEY_NAMESPACE: {{ .Values.global.database.nameSpace }}
+  PRIVILEGED_USER_SECRETKEY_NAME: {{ .Values.global.database.privilegedUserSecretName }} 
+  COMMON_DB_UNAME_LITERAL: {{ .Values.global.database.dbUNameLiteral }}
+  COMMON_DB_PWD_LITERAL: {{ .Values.global.database.dbPwdLiteral }}
+
+  JETTY_MAX_CONCURRENT_PUSHEDSTREAMS: {{ .Values.jetty.maxConcurrentPushedStreams | quote}}
+  MAX_REQUESTS_QUEUED_PER_DESTINATION: {{ .Values.jetty.maxRequestsQueuedPerDestination | quote}}
+  MAX_CONNECTIONS_PER_DESTINATION: {{ .Values.jetty.maxConnectionsPerDestination | quote}}
+  MAX_CONNECTIONS_PER_IP: {{ .Values.jetty.maxConnectionsPerIp | quote}}
+  REQUEST_TIMEOUT: {{ .Values.jetty.request.timeout | quote}}
+  CONNECTION_TIMEOUT: {{ .Values.jetty.connectionTimeout | quote}}
+  IDLE_TIMEOUT: {{ .Values.jetty.idleTimeout | quote}}
+  DNS_REFRESH_DELAY: {{ .Values.jetty.dnsRefreshDelay | quote}}
+  PING_DELAY_DURATION: {{ .Values.jetty.pingDelay | quote}}
+  CONNECT_FAILURE_THRESHOLD: {{ .Values.jetty.connectionFailureThreshold | quote}}
+  SERVICE_MESH_CHECK: {{ template "servicemesh.check" . }}
+
+  DEFAULT_CAPACITY: {{ .Values.global.defaultCapacity | quote }}
+  
+
+  # Watch Dog configuration
+  IS_THREAD_WATCHDOG_ENABLED: {{ .Values.watchDog.isThreadWatchDogEnabled | quote}}
+  WATCHDOG_FAILURE_RANGE: {{ .Values.watchDog.watchDogFailureRange | quote}}
+  WATCHDOG_THREAD_MAX_EXECUTION_TIME: {{ .Values.watchDog.watchDogThreadMaxExecutionTime | quote}}
+  WATCHDOG_MONITORING_INTERVAL: {{ .Values.watchDog.watchDogMonitoringInterval | quote}}
+{{- end }}

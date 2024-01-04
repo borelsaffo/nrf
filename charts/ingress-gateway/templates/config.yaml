@@ -1,0 +1,1356 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name:  {{ template "configmap.fullname" .}}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: ingress-front-end
+  annotations:
+    {{- include "annotations.allResources" . }}
+data:
+  APP_NAME: {{ template "chart.fullname" .}}
+  ENGINEERING_VERSION: {{.Chart.Version}}
+  MARKETING_VERSION: {{.Chart.AppVersion}}
+  SSL_ENABLED: {{ include "initcontainer.enabled" . | quote }}
+  SSL_PORT: {{ .Values.ports.containerPort | quote }}
+  TLS_VERSION: {{ .Values.service.ssl.tlsVersion | quote }}
+  #CIPHER_SUITE: {{ .Values.service.ssl.supportedCipherSuiteList }}
+  LOG_LEVEL: {{ .Values.log.level.updateContainer }}
+  SSL_PRIVATEKEY_SECRET_NAME: {{ .Values.service.ssl.privateKey.k8SecretName }}
+  SSL_PRIVATEKEY_SECRET_NAMESPACE: {{ .Values.service.ssl.privateKey.k8NameSpace }}
+  SSL_RSA_PRIVATE_KEY_FILENAME: {{ .Values.service.ssl.privateKey.rsa.fileName }}
+  SSL_ECDSA_PRIVATE_KEY_FILENAME: {{ .Values.service.ssl.privateKey.ecdsa.fileName }}
+  SSL_CERTIFICATE_SECRET_NAME: {{ .Values.service.ssl.certificate.k8SecretName }}
+  SSL_CERTIFICATE_SECRET_NAMESPACE: {{ .Values.service.ssl.certificate.k8NameSpace }}
+  SSL_RSA_CERTIFICATE_FILENAME: {{ .Values.service.ssl.certificate.rsa.fileName }}
+  SSL_ECDSA_CERTIFICATE_FILENAME: {{ .Values.service.ssl.certificate.ecdsa.fileName }}
+  SSL_INITIAL_ALGORITHM: {{ .Values.service.ssl.initialAlgorithm }}
+  SSL_CA_BUNDLE_SECRET_NAME: {{ .Values.service.ssl.caBundle.k8SecretName }}
+  SSL_CA_BUNDLE_SECRET_NAMESPACE: {{ .Values.service.ssl.caBundle.k8NameSpace }}
+  SSL_CA_BUNDLE_FILENAME: {{ .Values.service.ssl.caBundle.fileName }}
+  SSL_KEYSTORE_PASSWORD_SECRET_NAME: {{ .Values.service.ssl.keyStorePassword.k8SecretName }}
+  SSL_KEYSTORE_PASSWORD_SECRET_NAMESPACE: {{ .Values.service.ssl.keyStorePassword.k8NameSpace }}
+  SSL_KEYSTORE_PASSWORD_FILENAME: {{ .Values.service.ssl.keyStorePassword.fileName }}
+  SSL_TRUSTSTORE_PASSWORD_SECRET_NAME: {{ .Values.service.ssl.trustStorePassword.k8SecretName }}
+  SSL_TRUSTSTORE_PASSWORD_SECRET_NAMESPACE: {{ .Values.service.ssl.trustStorePassword.k8NameSpace }}
+  SSL_TRUSTSTORE_PASSWORD_FILENAME: {{ .Values.service.ssl.trustStorePassword.fileName }}
+  INIT_SSL: {{ include "initcontainer.enabled" . | quote }}
+  GATEWAY_PORT: {{.Values.ports.containerPort | quote }}
+  GATEWAY_CERT_RELOAD_ENABLED: {{ .Values.ingressGwCertReloadEnabled | quote}}
+  GATEWAY_CERT_RELOAD_PATH: {{ .Values.ingressGwCertReloadPath }}
+  GATEWAY_CERT_RELOAD_DELAY: {{ .Values.ingressGwCertReloadDelay | quote}}
+  CNCC_HTTP1_ENABLED: {{ .Values.cncc.enablehttp1 | quote}}
+  application.yaml: |-
+    spring:
+      lifecycle:
+        timeout-per-shutdown-phase: {{ .Values.gracefulShutdown.gracePeriod | quote }}
+      cloud:
+        gateway:
+          default-filters:
+          {{- if .Values.globalRemoveRequestHeader }}
+            {{- range .Values.globalRemoveRequestHeader }}
+            - RemoveRequestHeader={{ .name }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.globalRemoveResponseHeader }}
+            {{- range .Values.globalRemoveResponseHeader }}
+            - RemoveResponseHeader={{ .name }}
+            {{- end }}
+          {{- end }}
+          x-forwarded.for-enabled: {{ .Values.enableXForwardedForHeader }}
+          x-forwarded.host-enabled: {{ .Values.enableXForwardedHostHeader }}
+          x-forwarded.port-enabled: {{ .Values.enableXForwardedPortHeader }}
+          x-forwarded.proto-enabled: {{ .Values.enableXForwardedProtoHeader }}
+          x-forwarded.prefix-enabled: {{ .Values.enableXForwardedPrefixHeader }}
+          routes:
+          {{- if eq (.Values.routeConfigMode | default "HELM" ) "HELM" }}
+          {{- if .Values.routesConfigTpl }}
+            {{- tpl .Values.routesConfigTpl . | nindent 12 }}
+          {{- else if .Values.global.multiClusterMultiInstanceEnabled }}
+            {{- include "cncc.createRoutes" . | nindent 6 }}            
+          {{- else }}
+          {{- $ratelimit := .Values.rateLimiting.enabled }}
+            {{- range .Values.routesConfig }}
+              - id: {{ .id }}
+                uri: {{ tpl ( .uri ) $ }}
+                {{- if .order }}
+                order: {{ .order }}
+                {{- end}}
+                predicates:
+                  - Path= {{ .path }}
+                  {{- if .method }}
+                  - Method= {{ .method}}
+                  {{- end}}
+                  {{- if .readBodyForLog }}
+                  - ReadBodyForLog= {{ .readBodyForLog}}
+                  {{- end}}
+              {{- if .metadata }}
+                metadata:
+                {{- if .metadata.requestTimeout }}
+                    requestTimeout: {{ .metadata.requestTimeout }}
+                {{- end }}
+                {{- if .metadata.requiredTime }}
+                    requiredTime: {{ .metadata.requiredTime }}
+                {{- end }}
+                {{- if .metadata.xfccHeaderValidation }}
+                    xfccHeaderValidation:
+                      validationEnabled: {{ .metadata.xfccHeaderValidation.validationEnabled }}
+                {{- end }}
+                {{- if .metadata.ccaHeaderValidation }}
+                    ccaHeaderValidation:
+                      enabled: {{ .metadata.ccaHeaderValidation.enabled }}
+                {{- end }}
+                {{- if .metadata.configurableErrorCodes }}
+                    configurableErrorCodes:
+                      enabled: {{ .metadata.configurableErrorCodes.enabled }}
+                    {{- if .metadata.configurableErrorCodes.enabled }}
+                      errorScenarios:
+                    {{- range .metadata.configurableErrorCodes.errorScenarios }}
+                      - exceptionType: {{ .exceptionType | quote }}
+                        errorProfileName: {{ .errorProfileName | quote }}
+                    {{- end }}
+                    {{- end }}
+                {{- end }}
+                {{- if .metadata.oauthValidator }}
+                    oauthValidator:
+                      enabled: {{ .metadata.oauthValidator.enabled }}
+                {{- end }}
+                {{- if .metadata.svcName }}
+                    svcName: {{ .metadata.svcName }}
+                {{- end }}
+                {{- if .metadata.serverHeaderDetails }}
+                    serverHeaderDetails:
+                      enabled: {{ .metadata.serverHeaderDetails.enabled }}
+                  {{- if .metadata.serverHeaderDetails.errorCodeSeriesId }}
+                      errorCodeSeriesId: {{ .metadata.serverHeaderDetails.errorCodeSeriesId }}
+                  {{- end }}
+                {{- end }}
+              {{- end }}
+              {{- if .filters }}
+                filters:
+                {{- if .filters.subLog }}
+                  - SubLog= {{ .filters.subLog }}
+                {{- end }}
+                {{- if .filters.rewritePath }}
+                  - RewritePath= {{ .filters.rewritePath }}
+                {{- end }}
+                {{- if .filters.prefixPath }}
+                  - PrefixPath= {{ .filters.prefixPath }}
+                {{- end }}
+                {{- if .filters.addCnccHeaderFilter }}
+                  - AddCnccHeader
+                {{- end }}
+                {{- if .filters.addRequestHeader }}
+                  {{- range .filters.addRequestHeader }}
+                  - AddRequestHeader={{ .name }}, {{ .value }}
+                  {{- end }}
+                {{- end }}
+                {{- if .removeRequestHeader }}
+                  {{- range .removeRequestHeader }}
+                  - RemoveRequestHeader={{ .name }}
+                  {{- end }}
+                {{- end }}
+                {{- if .removeResponseHeader }}
+                  {{- range .removeResponseHeader }}
+                  - RemoveResponseHeader={{ .name }}
+                  {{- end }}
+                {{- end }}
+                {{- if .filters.invalidRouteFilter }}
+                  - name: InvalidRouteFilter
+                    args:
+                      {{- range .filters.invalidRouteFilter }}
+                      errorCodeOnInvalidRoute: {{ .errorCodeOnInvalidRoute }}
+                      errorCauseOnInvalidRoute: {{ .errorCauseOnInvalidRoute }}
+                      errorTitleOnInvalidRoute: {{ .errorTitleOnInvalidRoute }}
+                      errorDescriptionOnInvalidRoute: {{ .errorDescriptionOnInvalidRoute }}
+                      redirectUrl: {{ .redirectUrl }}
+                      {{- end }}
+                {{- end }}
+                {{- if and $.Values.enableControlledShutdown .filters.controlledShutdownFilter }}
+                  - name: ControlledShutdownFilter
+                    args:
+                      applicableShutdownStates:
+                      {{- range .filters.controlledShutdownFilter.applicableShutdownStates }}
+                      - {{ . }}
+                      {{- end }}
+                      unsupportedOperations:
+                      {{- range .filters.controlledShutdownFilter.unsupportedOperations }}
+                      - {{ . }}
+                      {{- end }}
+                {{- end }}    
+                {{- if .filters.customReqHeaderEntryFilter }}
+                  - name: CustomReqHeaderEntryFilter
+                    args:
+                         {{- if .filters.customReqHeaderEntryFilter.headers }}
+                         headers:
+                             {{- range .filters.customReqHeaderEntryFilter.headers }}
+                             - methods:
+                                 {{- range .methods }}
+                                 - {{.}}
+                                 {{- end }}
+                               headersList:
+                                 {{- range .headersList }}
+                                 - headerName: {{ .headerName }}
+                                   defaultVal: {{ .defaultVal }}
+                                   source: {{ .source }}
+                                   sourceHeader: {{ .sourceHeader }}
+                                   override: {{ .override }}
+                                 {{- end }}
+                               {{- end }}
+                         {{- end }}
+                {{- end }}
+                {{- if .filters.customReqHeaderExitFilter }}
+                  - name: CustomReqHeaderExitFilter
+                    args:
+                         {{- if .filters.customReqHeaderExitFilter.headers }}
+                         headers:
+                             {{- range .filters.customReqHeaderExitFilter.headers }}
+                             - methods:
+                                 {{- range .methods }}
+                                 - {{.}}
+                                 {{- end }}
+                               headersList:
+                                 {{- range .headersList }}
+                                 - headerName: {{ .headerName }}
+                                   defaultVal: {{ .defaultVal }}
+                                   source: {{ .source }}
+                                   sourceHeader: {{ .sourceHeader }}
+                                   override: {{ .override }}
+                                 {{- end }}
+                               {{- end }}
+                         {{- end }}
+                {{- end }}
+                {{- if .filters.customResHeaderEntryFilter }}
+                  - name: CustomResHeaderEntryFilter
+                    args:
+                         {{- if .filters.customResHeaderEntryFilter.headers }}
+                         headers:
+                             {{- range .filters.customResHeaderEntryFilter.headers }}
+                             - methods:
+                                 {{- range .methods }}
+                                 - {{ . }}
+                                 {{- end }}
+                               headersList:
+                                 {{- range .headersList }}
+                                 - headerName: {{ .headerName }}
+                                   defaultVal: {{ .defaultVal }}
+                                   source: {{ .source }}
+                                   sourceHeader: {{ .sourceHeader }}
+                                   override: {{ .override }}
+                                 {{- end }}
+                            {{- end }}
+                        {{- end }}
+                {{- end }}
+                {{- if .filters.customResHeaderExitFilter }}
+                  - name: CustomResHeaderExitFilter
+                    args:
+                         {{- if .filters.customResHeaderExitFilter.headers }}
+                         headers:
+                             {{- range .filters.customResHeaderExitFilter.headers }}
+                             - methods:
+                                 {{- range .methods }}
+                                 - {{ . }}
+                                 {{- end }}
+                               headersList:
+                                 {{- range .headersList }}
+                                 - headerName: {{ .headerName }}
+                                   defaultVal: {{ .defaultVal }}
+                                   source: {{ .source }}
+                                   sourceHeader: {{ .sourceHeader }}
+                                   override: {{ .override }}
+                                 {{- end }}
+                            {{- end }}
+                        {{- end }}
+                {{- end }}
+
+            {{- end }}
+            {{- end }}
+            {{- end }}
+          {{- end }}
+
+    {{- if .Values.cncc.enabled }}
+      {{- if eq ( include "cncc.onlyResourceServerEnabled" . ) "false" }}  
+      security:
+        oauth2:
+          client:
+            registration:
+              cncc-iam:
+                client-id: {{ .Values.cncc.iam.clientId }}
+                authorization-grant-type: authorization_code
+                redirect-uri: '{baseUrl}/login/oauth2/code/{registrationId}'
+                client-authentication-method: {{ .Values.cncc.iam.clientAuthenticationMethod }}
+            provider:
+              cncc-iam:
+                issuer-uri: {{ template "cncc.primaryIssuer" . }}
+                user-name-attribute: preferred_username
+      {{- end }}
+    {{- else }}
+      autoconfigure:
+        exclude: ${spring.autoconfigure.rsac}, ${spring.autoconfigure.rusac}, ${spring.autoconfigure.rmwsas}
+        rsac: org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration
+        rusac: org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration
+        rmwsas: org.springframework.boot.actuate.autoconfigure.security.reactive.ReactiveManagementWebSecurityAutoConfiguration
+    {{- end }}
+
+    {{- if .Values.publishHeaders }}
+    publishHeaders: {{ .Values.publishHeaders }}
+    {{- else }}
+    publishHeaders: "false"
+    {{- end }}
+    {{- if .Values.isSbiTimerEnabled }}
+    isSbiTimerEnabled: {{ .Values.isSbiTimerEnabled }}
+    sbiTimerTimezone: {{ .Values.sbiTimerTimezone }}
+    {{- else }}
+    isSbiTimerEnabled: false
+    sbiTimerTimezone: "GMT"
+    {{- end }}
+    metricPrefix: ${METRIC_PREFIX:myprefix}
+    metricSuffix: ${METRIC_SUFFIX:mysuffix}
+    autoRedirect: ${AUTO_REDIRECT:true}
+    
+    {{- if .Values.sbiPriorityHeaderName }}
+    sbiPriorityHeaderName: {{ .Values.sbiPriorityHeaderName }}
+    {{- end }}
+
+    {{- if .Values.routeConfigMode }}
+    routeConfigMode: {{ .Values.routeConfigMode }}
+    {{- else }}
+    routeConfigMode: "HELM"
+    {{- end }}
+    {{- if .Values.convertHelmRoutesToREST }}
+    convertHelmRoutesToREST: {{ .Values.convertHelmRoutesToREST }}
+    {{- else }}
+    convertHelmRoutesToREST: false
+    {{- end }}
+    {{- if .Values.readinessCheckEnabled }}
+    readinessCheckEnabled: {{ .Values.readinessCheckEnabled }}
+    readinessConfigMode: {{ .Values.readinessConfigMode }}
+    readinessIndicatorPollingInterval: {{ .Values.readinessIndicatorPollingInterval }}
+    {{- if .Values.readinessConfigMode | eq "HELM" }}
+    readinessConfig:
+      serviceProfiles:
+      {{- range .Values.readinessConfig.serviceProfiles }}
+      - id: {{ .id | quote }}
+        url: {{ tpl ( .url ) $ }}
+        responseCode: {{ .responseCode | quote }}
+        responseBody: {{ .responseBody | quote }}
+        onExceptionUsePreviousState: {{ .onExceptionUsePreviousState | quote }}
+        initialState: {{ .initialState | quote }}
+        {{- if .requestTimeout }}
+        requestTimeout: {{ .requestTimeout | quote }}
+        {{- end}}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+    userAgentHeaderValidationConfigMode: {{ .Values.userAgentHeaderValidationConfigMode }}
+    {{- if .Values.userAgentHeaderValidation }}
+    userAgentHeaderValidation:
+      enabled: {{ .Values.userAgentHeaderValidation.enabled }}
+      validationType: {{ .Values.userAgentHeaderValidation.validationType }}
+      consumerNfTypes:
+      {{- range .Values.userAgentHeaderValidation.consumerNfTypes }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+
+    scg:
+      alpn: ${ENV_ALPN:false}
+      gzip: ${ENV_GZIP:false}
+
+    http1:
+      client: 
+        keepAlive: {{ .Values.http1.client.keepAlive }}
+        useConnectionPool: {{ .Values.http1.client.useConnectionPool }}
+
+    {{ if .Values.cncc.enabled }}
+    {{- include "cncc.mimcConfig" . }}
+    {{- end }}
+
+    {{ include "cncc.loggingMasks" . }}
+
+    {{ include "cncc.loggingFilters" . }}
+
+    cncc:
+      enabled: {{ .Values.cncc.enabled }}
+      onlyResourceServerEnabled: {{ template "cncc.onlyResourceServerEnabled" . }}      
+      enablehttp1: {{ .Values.cncc.enablehttp1 }}
+      securityLogEnabled: {{ .Values.cncc.securityLogEnabled }}
+      cacheRequestBodyEnabled: {{ .Values.cncc.cacheRequestBodyEnabled }}
+      metricsEnabled: {{ .Values.cncc.metricsEnabled }}
+      {{ if .Values.cncc.client }}
+      client:
+        maxConnections: {{ .Values.cncc.client.maxConnections | default 500 }}
+        pendingAcquireMaxCount: {{ .Values.cncc.client.pendingAcquireMaxCount | default 1000 }}
+        pendingAcquireTimeout: {{ .Values.cncc.client.pendingAcquireTimeout | default 45 }}
+        evictInBackground: {{ .Values.cncc.client.evictInBackground | default 120 }}
+      {{- end }}
+      {{ if .Values.cncc.headers }}
+      headers:
+        userNameHeader: {{ .Values.cncc.headers.userNameHeader }}
+        userIdHeader: {{ .Values.cncc.headers.userIdHeader }}
+        roleHeader: {{ .Values.cncc.headers.roleHeader }}
+      {{- end }}
+      core:
+        sessionTimeout: {{.Values.cncc.core.sessionTimeout }}
+        authRules:
+        {{- with .Values.cncc.core.authRules }}
+        {{- toYaml . | nindent 10 }}
+        {{- end }}
+      iam:
+        issuers: 
+        {{- include "cncc.iam.issuers" . }}
+    
+    sepp:
+      forwardProxy: {{ .Values.sepp.forwardProxy }}
+    
+    prefix: {{ $.Values.prefix }}
+
+    dns-srv:
+      host: {{ template "service.alternateRouteSvcFullname" . }}
+      port: {{ .Values.dnsSrv.port }}
+      scheme: {{ .Values.dnsSrv.scheme }}
+
+    xfcc-header-validation:
+      validationEnabled: {{ .Values.global.xfccHeaderValidation.validation.enabled }}
+      dnsResolutionInterval: {{ .Values.global.xfccHeaderValidation.validation.dnsResolutionInterval }}
+      peerList:
+      {{- if .Values.global.xfccHeaderValidation.validation.nfList }}
+      {{- range .Values.global.xfccHeaderValidation.validation.nfList }}
+        - name: {{.}}
+          enabled: {{ true }}
+      {{- end }}
+      {{- else }}
+      {{- range .Values.global.xfccHeaderValidation.validation.peerList }}
+      {{- if  kindIs "string" . }}
+        - name: {{.}}
+          enabled: {{ true }}
+      {{- else }}
+        - name: {{ .name | quote }}
+      {{- if (hasKey . "enabled") }}
+          enabled: {{ .enabled | quote }}
+      {{- else }}
+          enabled: {{ true | quote }}
+      {{- end }}
+      {{- if (hasKey . "scheme") }}
+          scheme: {{ .scheme | quote }}
+      {{- end }}
+      {{- if (hasKey . "type") }}
+          type: {{ .type | quote }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      matchCerts: {{ .Values.global.xfccHeaderValidation.validation.matchCerts | quote }}
+      matchField: {{ .Values.global.xfccHeaderValidation.validation.matchField }}
+
+      extractEnabled: {{ .Values.global.xfccHeaderValidation.extract.enabled }}
+      certExtractIndex: {{ .Values.global.xfccHeaderValidation.extract.certExtractIndex | quote }}
+      extractField: {{ .Values.global.xfccHeaderValidation.extract.extractField }}
+      extractIndex: {{ .Values.global.xfccHeaderValidation.extract.extractIndex | quote }}
+    
+    ccaHeaderValidationConfigMode: {{ .Values.ccaHeaderValidationConfigMode }}
+    
+    {{- if eq .Values.ccaHeaderValidationConfigMode "HELM" }}
+    cca-header-validation:
+      enabled: {{ .Values.ccaHeaderValidation.enabled }}
+      minExpiryTime: {{ .Values.ccaHeaderValidation.minExpiryTime }}
+      maxTokenAge: {{ .Values.ccaHeaderValidation.maxTokenAge }}
+      role: {{ .Values.ccaHeaderValidation.role }}
+      subKey: {{ .Values.ccaHeaderValidation.subKey }}
+      validationRule: {{ .Values.ccaHeaderValidation.validationRule }}
+      k8SecretName: {{ .Values.ccaHeaderValidation.k8SecretName }}
+      k8NameSpace: {{ .Values.ccaHeaderValidation.k8NameSpace }}
+      fileName: {{ .Values.ccaHeaderValidation.fileName }}
+      ccaReloadCertInterval: {{ .Values.ccaHeaderValidation.ccaReloadCertInterval }}
+    {{- else if eq .Values.ccaHeaderValidationConfigMode "REST" }}
+    cca-header-validation:
+      k8SecretName: {{ .Values.ccaHeaderValidation.k8SecretName }}
+      k8NameSpace: {{ .Values.ccaHeaderValidation.k8NameSpace }}
+      fileName: {{ .Values.ccaHeaderValidation.fileName }}
+    {{- end }}
+    
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+    
+    server:
+      port: {{.Values.ports.containerPort }}
+      shutdown: graceful
+    
+    ratelimiting:
+      enabled: {{.Values.rateLimiting.enabled }}
+      rssRateLimiter:
+        enabled: {{.Values.rssRateLimiter.enabled }}
+      globalRateLimiter:
+        enabled: {{.Values.globalIngressRateLimiting.enabled }}
+      duration: ${GLOBAL_RATELIMITING_DURATION:60}
+      capacity: ${GLOBAL_RATELIMITING_BUCKETCAPACITY:2}
+      refillRate: ${GLOBAL_RATELIMITING_REFILLRATE:1}
+      minTokenRequest: {{.Values.globalIngressRateLimiting.minTokenRequest }}
+      maxTokenRequest: {{.Values.globalIngressRateLimiting.maxTokenRequest }}
+      rangePoint: {{.Values.globalIngressRateLimiting.rangePoint }}
+    
+    {{- $globalRateLimitingFlag := false }}
+    {{- if .Values.errorCodeOnRatelimit }}
+    {{- $globalRateLimitingFlag = true }}
+    {{- end }}
+
+    {{- $gracefulShutdownFlag := false }}
+    {{- if .Values.gracefulShutdown.defaultErrorCode }}
+    {{- $gracefulShutdownFlag = true }}
+    {{- end }}
+
+    {{- $xfccHeaderValidationFlag := false }}
+    {{- if .Values.global.xfccHeaderValidation.validation.errorCodeOnValidationFailure }}
+    {{- $xfccHeaderValidationFlag = true }}
+    {{- end }}
+
+    {{- $oauthValidatordFlag := false }}
+    {{- if .Values.oauthErrorConfigForValidationFailure }}
+    {{- $oauthValidatordFlag = true }}
+    {{- end }}
+
+    {{- $configErrorCodesFlag := false }}
+    {{- if .Values.configurableErrorCodes }}
+    {{- range .Values.configurableErrorCodes.errorScenarios }}
+    {{- if.errorCode }}
+    {{- $configErrorCodesFlag = true }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    
+    {{- if or $globalRateLimitingFlag $gracefulShutdownFlag $xfccHeaderValidationFlag $oauthValidatordFlag $configErrorCodesFlag }}
+    backwardCompatibility: true
+    {{- else }}
+    backwardCompatibility: false
+    {{- end }}
+    
+    configurable-error-codes:
+    {{- $enabled := false }}
+    {{- if or .Values.configurableErrorCodes.enabled $globalRateLimitingFlag $gracefulShutdownFlag $xfccHeaderValidationFlag $oauthValidatordFlag }}
+      enabled: true
+    {{- $enabled = true }}
+    {{- else }}
+    {{- $enabled = false }}
+      enabled: false
+    {{- end }}
+    
+    {{- if $enabled }}
+      errorScenarios:
+    {{- if .Values.configurableErrorCodes.enabled }}
+    {{- range .Values.configurableErrorCodes.errorScenarios }}
+    {{- if .errorProfileName }}
+      - exceptionType: {{ .exceptionType | quote }}
+        errorProfileName: {{ .errorProfileName | quote }}
+    {{- else if eq (.exceptionType ) "ConnectionTimeout" }}
+      - exceptionType: {{ "CONNECTION_TIMEOUT" }}
+        errorProfileName: {{ "ERR_100" }}
+    {{- else if eq (.exceptionType ) "RequestTimeout" }}
+      - exceptionType: {{ "REQUEST_TIMEOUT" }}
+        errorProfileName: {{ "ERR_101" }}
+    {{- else if eq (.exceptionType ) "UnknownHostException" }}
+      - exceptionType: {{ "UNKNOWN_HOST_EXCEPTION" }}
+        errorProfileName: {{ "ERR_102" }}
+    {{- else if eq (.exceptionType ) "ConnectException" }}
+      - exceptionType: {{ "CONNECT_EXCEPTION" }}
+        errorProfileName: {{ "ERR_103" }}
+    {{- else if eq (.exceptionType ) "RejectedExecutionException" }}
+      - exceptionType: {{ "REJECTED_EXECUTION_EXCEPTION" }}
+        errorProfileName: {{ "ERR_104" }}
+    {{- else if eq (.exceptionType ) "ClosedChannelException" }}
+      - exceptionType: {{ "CLOSED_CHANNEL_EXCEPTION" }}
+        errorProfileName: {{ "ERR_105" }}
+    {{- else if eq (.exceptionType ) "BlackListIpException" }}
+      - exceptionType: {{ "BLACKLIST_IP_EXCEPTION" }}
+        errorProfileName: {{ "ERR_106" }}
+    {{- else if eq (.exceptionType ) "InternalError" }}
+      - exceptionType: {{ "INTERNAL_ERROR" }}
+        errorProfileName: {{ "ERR_107" }}
+    {{- else if eq (.exceptionType ) "NotFoundException" }}
+      - exceptionType: {{ "NOT_FOUND_EXCEPTION" }}
+        errorProfileName: {{ "ERR_108" }}
+    {{- else if eq (.exceptionType ) "LateArrivalException" }}
+      - exceptionType: {{ "LATE_ARRIVAL_EXCEPTION" }}
+        errorProfileName: {{ "ERR_109" }}
+    {{- else if eq (.exceptionType ) "UserAgentHeaderValidationFailureException" }}
+      - exceptionType: {{ "USERAGENT_VALIDATION_FAILURE_EXCEPTION" }}
+        errorProfileName: {{ "ERR_110" }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    
+    {{- if $gracefulShutdownFlag }}
+      - exceptionType: {{ "GRACEFUL_SHUTDOWN" }}
+        errorProfileName: {{ "ERR_112" }}
+    {{- end }}
+    
+    {{- if $xfccHeaderValidationFlag }}
+    {{- if .Values.global.xfccHeaderValidation.validation.errorCodeOnValidationFailure }}
+      - exceptionType: {{ "XFCC_HEADER_VALIDATION_FAILURE" }}
+        errorProfileName: {{ "ERR_113" }}
+    {{- end }}
+    {{- range .Values.global.xfccHeaderValidation.validation.errorTrigger }}
+    {{- if eq (.exceptionType ) "XFCC_HEADER_NOT_PRESENT_OR_EMPTY" }}
+      - exceptionType: {{ "XFCC_HEADER_NOT_PRESENT_OR_EMPTY" }}
+        errorProfileName: {{ "ERR_114" }}
+    {{- else if eq (.exceptionType ) "XFCC_MATCHCERTCOUNT_GREATER_THAN_CERTS_IN_HEADER" }}
+      - exceptionType: {{ "XFCC_MATCHCERTCOUNT_GREATER_THAN_CERTS_IN_HEADER" }}
+        errorProfileName: {{ "ERR_115" }}
+    {{- else if eq (.exceptionType ) "XFCC_HEADER_INVALID" }}
+      - exceptionType: {{ "XFCC_HEADER_INVALID" }}
+        errorProfileName: {{ "ERR_116" }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    
+    {{- if .Values.oauthErrorConfigForValidationFailure}}
+      - exceptionType: {{ "OAUTH_TOKEN_VALIDATION_FAILURE" }}
+        errorProfileName: {{ "ERR_117" }}
+    {{- end }}
+
+    {{- if .Values.oauthErrorConfigOnTokenAbsence }}
+      - exceptionType: {{ "OAUTH_TOKEN_ABSENCE" }}
+        errorProfileName: {{ "ERR_126" }}
+    {{- end }}
+
+    {{- if $globalRateLimitingFlag }}
+      - exceptionType: {{ "GLOBAL_RATELIMIT" }}
+        errorProfileName: {{ "ERR_111" }}
+    {{- end }}
+    
+    {{- if $oauthValidatordFlag }}
+    {{- range .Values.oauthErrorConfigForValidationFailure.errorTrigger }}
+    {{- if eq (.exceptionType ) "OAUTH_CERT_EXPIRED" }}
+      - exceptionType: {{ "OAUTH_CERT_EXPIRED" }}
+        errorProfileName: {{ "ERR_118" }}
+    {{- else if eq (.exceptionType ) "OAUTH_MISMATCH_IN_KID" }}
+      - exceptionType: {{ "OAUTH_MISMATCH_IN_KID" }}
+        errorProfileName: {{ "ERR_119" }}
+    {{- else if eq (.exceptionType ) "OAUTH_PRODUCER_SCOPE_NOT_PRESENT" }}
+      - exceptionType: {{ "OAUTH_PRODUCER_SCOPE_NOT_PRESENT" }}
+        errorProfileName: {{ "ERR_120" }}
+    {{- else if eq (.exceptionType ) "OAUTH_PRODUCER_SCOPE_MISMATCH" }}
+      - exceptionType: {{ "OAUTH_PRODUCER_SCOPE_MISMATCH" }}
+        errorProfileName: {{ "ERR_121" }}
+    {{- else if eq (.exceptionType ) "OAUTH_MISMATCH_IN_NRF_INSTANCEID" }}
+      - exceptionType: {{ "OAUTH_MISMATCH_IN_NRF_INSTANCEID" }}
+        errorProfileName: {{ "ERR_122" }}
+    {{- else if eq (.exceptionType ) "OAUTH_PRODUCER_PLMNID_MISMATCH" }}
+      - exceptionType: {{ "OAUTH_PRODUCER_PLMNID_MISMATCH" }}
+        errorProfileName: {{ "ERR_123" }}
+    {{- else if eq (.exceptionType ) "OAUTH_AUDIENCE_NOT_PRESENT_OR_INVALID" }}
+      - exceptionType: {{ "OAUTH_AUDIENCE_NOT_PRESENT_OR_INVALID" }}
+        errorProfileName: {{ "ERR_124" }}
+    {{- else if eq (.exceptionType ) "OAUTH_TOKEN_INVALID" }}
+      - exceptionType: {{ "OAUTH_TOKEN_INVALID" }}
+        errorProfileName: {{ "ERR_125" }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    
+    {{- end }}    
+
+    error-code-profiles:
+      errorCodeProfiles:
+      {{- if .Values.errorCodeProfiles }}
+      {{- range .Values.errorCodeProfiles }}
+        - name: {{ .name | quote }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote }}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+          {{- if .redirectUrl }}
+          redirectUrl: {{ .redirectUrl | quote }}
+          {{- end }}          
+      {{- end }}
+      {{- end }}
+    
+    {{- if .Values.configurableErrorCodes.enabled }}
+    {{- range .Values.configurableErrorCodes.errorScenarios }}
+      {{- if eq (.exceptionType ) "ConnectionTimeout" }}
+        - name: {{ "ERR_100" }}
+      {{- else if eq (.exceptionType ) "RequestTimeout" }}
+        - name: {{ "ERR_101" }}
+      {{- else if eq (.exceptionType ) "UnknownHostException" }}
+        - name: {{ "ERR_102" }}
+      {{- else if eq (.exceptionType ) "ConnectException" }}
+        - name: {{ "ERR_103" }}
+      {{- else if eq (.exceptionType ) "RejectedExecutionException" }}
+        - name: {{ "ERR_104" }}
+      {{- else if eq (.exceptionType ) "ClosedChannelException" }}
+        - name: {{ "ERR_105" }}
+      {{- else if eq (.exceptionType ) "BlackListIpException" }}
+        - name: {{ "ERR_106" }}
+      {{- else if eq (.exceptionType ) "InternalError" }}
+        - name: {{ "ERR_107" }}
+      {{- else if eq (.exceptionType ) "NotFoundException" }}
+        - name: {{ "ERR_108" }}
+      {{- else if eq (.exceptionType ) "LateArrivalException" }}
+        - name: {{ "ERR_109" }}
+      {{- else if eq (.exceptionType ) "UserAgentHeaderValidationFailureException" }}
+        - name: {{ "ERR_110" }}
+      {{- end }}
+      {{- if .errorCode }}
+          errorCode: {{ .errorCode }}
+      {{- end }}
+      {{- if .errorCause }}
+          errorCause: {{ .errorCause }}
+      {{- end }}
+      {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle }}
+      {{- end }}
+      {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+    
+      {{- if $gracefulShutdownFlag }}
+        - name: {{ "ERR_112" }}
+          errorCode: {{ .Values.gracefulShutdown.defaultErrorCode }}
+        {{- if .Values.gracefulShutdown.errorCause }}
+          errorCause: {{ .Values.gracefulShutdown.errorCause | quote }}
+        {{- end }}
+        {{- if .Values.gracefulShutdown.errorTitle }}
+          errorTitle: {{ .Values.gracefulShutdown.errorTitle | quote }}
+        {{- end }}
+        {{- if .Values.gracefulShutdown.errorDescription }}
+          errorDescription: {{ .Values.gracefulShutdown.errorDescription | quote }}
+        {{- end }}
+        {{- if .Values.gracefulShutdown.retryAfter }}
+          retryAfter: {{ .Values.gracefulShutdown.retryAfter | quote }}
+        {{- end }}
+        {{- if .Values.gracefulShutdown.redirectUrl }}
+          redirectUrl: {{ .Values.gracefulShutdown.redirectUrl | quote }}
+        {{- end }}
+      {{- end }}
+    
+      {{- if .Values.global.xfccHeaderValidation.validation.errorCodeOnValidationFailure }}
+        - name: {{ "ERR_113" }}
+          errorCode: {{ .Values.global.xfccHeaderValidation.validation.errorCodeOnValidationFailure }}
+        {{- if .Values.global.xfccHeaderValidation.validation.errorCauseOnValidationFailure }}
+          errorCause: {{ .Values.global.xfccHeaderValidation.validation.errorCauseOnValidationFailure | quote }}
+        {{- end }}
+        {{- if .Values.global.xfccHeaderValidation.validation.errorTitleOnValidationFailure }}
+          errorTitle: {{ .Values.global.xfccHeaderValidation.validation.errorTitleOnValidationFailure | quote }}
+        {{- end }}
+        {{- if .Values.global.xfccHeaderValidation.validation.errorDescriptionOnValidationFailure }}
+          errorDescription: {{ .Values.global.xfccHeaderValidation.validation.errorDescriptionOnValidationFailure | quote }}
+        {{- end }}
+        {{- if .Values.global.xfccHeaderValidation.validation.retryAfter }}
+          retryAfter: {{ .Values.global.xfccHeaderValidation.validation.retryAfter | quote }}
+        {{- end }}
+        {{- if .Values.global.xfccHeaderValidation.validation.redirectUrl }}
+          redirectUrl: {{ .Values.global.xfccHeaderValidation.validation.redirectUrl | quote }}
+        {{- end }}
+      {{- end }}
+    
+      {{- if .Values.oauthErrorConfigForValidationFailure }}
+        - name: {{ "ERR_117" }}
+          errorCode: {{ .Values.oauthErrorConfigForValidationFailure.errorCode }}
+        {{- if .Values.oauthErrorConfigForValidationFailure.errorCause }}
+          errorCause: {{ .Values.oauthErrorConfigForValidationFailure.errorCause | quote }}
+        {{- end }}
+        {{- if .Values.oauthErrorConfigForValidationFailure.errorTitle }}
+          errorTitle: {{ .Values.oauthErrorConfigForValidationFailure.errorTitle | quote }}
+        {{- end }}
+        {{- if .Values.oauthErrorConfigForValidationFailure.errorDescription }}
+          errorDescription: {{ .Values.oauthErrorConfigForValidationFailure.errorDescription | quote }}
+        {{- end }}
+        {{- if .Values.oauthErrorConfigForValidationFailure.retryAfter }}
+          retryAfter: {{ .Values.oauthErrorConfigForValidationFailure.retryAfter | quote }}
+        {{- end }}
+        {{- if .Values.oauthErrorConfigForValidationFailure.redirectUrl }}
+          redirectUrl: {{ .Values.oauthErrorConfigForValidationFailure.redirectUrl | quote }}
+        {{- end }}
+      {{- end }}
+    
+      {{- if .Values.oauthErrorConfigOnTokenAbsence }}
+        - name: {{ "ERR_126" }}
+          errorCode: {{ .Values.oauthErrorConfigOnTokenAbsence.errorCode }}
+        {{- if .Values.oauthErrorConfigOnTokenAbsence.errorCause }}
+          errorCause: {{ .Values.oauthErrorConfigOnTokenAbsence.errorCause | quote }}
+        {{- end }}
+        {{- if .Values.oauthErrorConfigOnTokenAbsence.errorTitle }}
+          errorTitle: {{ .Values.oauthErrorConfigOnTokenAbsence.errorTitle | quote }}
+        {{- end }}
+        {{- if .Values.oauthErrorConfigOnTokenAbsence.errorDescription }}
+          errorDescription: {{ .Values.oauthErrorConfigOnTokenAbsence.errorDescription | quote }}
+        {{- end }}
+        {{- if .Values.oauthErrorConfigOnTokenAbsence.retryAfter }}
+          retryAfter: {{ .Values.oauthErrorConfigOnTokenAbsence.retryAfter | quote }}
+        {{- end }}
+        {{- if .Values.oauthErrorConfigOnTokenAbsence.redirectUrl }}
+          redirectUrl: {{ .Values.oauthErrorConfigOnTokenAbsence.redirectUrl | quote }}
+        {{- end }}
+      {{- end }}
+    
+      {{- if $globalRateLimitingFlag }}
+        - name: {{ "ERR_111" }}
+          errorCode: {{ .Values.errorCodeOnRatelimit }}
+        {{- if .Values.errorCauseOnRateLimit }}
+          errorCause: {{ .Values.errorCauseOnRateLimit | quote }}
+        {{- end }}
+        {{- if .Values.errorTitleOnRateLimit }}
+          errorTitle: {{ .Values.errorTitleOnRateLimit | quote }}
+        {{- end }}
+        {{- if .Values.errorDescriptionOnRatelimit }}
+          errorDescription: {{ .Values.errorDescriptionOnRatelimit | quote }}
+        {{- end }}
+        {{- if .Values.retryAfter }}
+          retryAfter: {{ .Values.retryAfter | quote }}
+        {{- end }}
+        {{- if .Values.redirectUrl }}
+          redirectUrl: {{ .Values.redirectUrl | quote }}
+        {{- end }}
+      {{- end }}
+
+      {{- if $xfccHeaderValidationFlag }}
+      {{- range .Values.global.xfccHeaderValidation.validation.errorTrigger }}
+        {{- if eq (.exceptionType ) "XFCC_HEADER_NOT_PRESENT_OR_EMPTY" }}
+        - name: {{ "ERR_114" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- else if eq (.exceptionType ) "XFCC_MATCHCERTCOUNT_GREATER_THAN_CERTS_IN_HEADER" }}
+        - name: {{ "ERR_115" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- else if eq (.exceptionType ) "XFCC_HEADER_INVALID" }}
+        - name: {{ "ERR_116" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+    
+      {{- if $oauthValidatordFlag }}
+      {{- range .Values.oauthErrorConfigForValidationFailure.errorTrigger }}
+        {{- if eq (.exceptionType ) "OAUTH_MISMATCH_IN_NRF_INSTANCEID" }}
+        - name: {{ "ERR_122" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- else if eq (.exceptionType ) "OAUTH_TOKEN_INVALID" }}
+        - name: {{ "ERR_125" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- else if eq (.exceptionType ) "OAUTH_CERT_EXPIRED" }}
+        - name: {{ "ERR_118" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- else if eq (.exceptionType ) "OAUTH_MISMATCH_IN_KID" }}
+        - name: {{ "ERR_119" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- else if eq (.exceptionType ) "OAUTH_PRODUCER_SCOPE_NOT_PRESENT" }}
+        - name: {{ "ERR_120" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- else if eq (.exceptionType ) "OAUTH_PRODUCER_SCOPE_MISMATCH" }}
+        - name: {{ "ERR_121" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- else if eq (.exceptionType ) "OAUTH_PRODUCER_PLMNID_MISMATCH" }}
+        - name: {{ "ERR_123" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- else if eq (.exceptionType ) "OAUTH_AUDIENCE_NOT_PRESENT_OR_INVALID" }}
+        - name: {{ "ERR_124" }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote}}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote}}
+          {{- end }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}      
+    
+    server-header-config-mode: {{ .Values.serverHeaderConfigMode }}
+    
+    applicationThreadPoolConfig:
+      corePoolSize: {{ .Values.applicationThreadPoolConfig.corePoolSize }}
+      maxPoolSize: {{ .Values.applicationThreadPoolConfig.maxPoolSize }}
+      queueCapacity: {{ .Values.applicationThreadPoolConfig.queueCapacity }}
+
+    {{- if .Values.serverHeaderConfigMode | eq "HELM" }}
+    {{- if .Values.serverHeaderDetails.enabled }}
+    server-header-details:
+      {{- if .Values.serverHeaderDetails.enabled }}
+      enabled: {{ .Values.serverHeaderDetails.enabled }}
+      {{- end }}
+      {{- if .Values.serverHeaderDetails.errorCodeSeriesId }}
+      errorCodeSeriesId: {{ .Values.serverHeaderDetails.errorCodeSeriesId }}
+      {{- end }}
+      configuration:
+        {{- if .Values.serverHeaderDetails.enabled }}
+        {{- if .Values.serverHeaderDetails.configuration.nfType }}
+        nfType: {{ .Values.serverHeaderDetails.configuration.nfType }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.serverHeaderDetails.configuration.nfInstanceId }}
+        nfInstanceId: {{ .Values.serverHeaderDetails.configuration.nfInstanceId }}
+        {{- end }}
+    {{- end }}
+    {{- end }}
+
+    errorCodeSeriesList:
+      configuredList:
+      {{- range .Values.errorCodeSeriesList }}
+      - id: {{ .id }}
+        errorCodeSeries: 
+        {{- range .errorCodeSeries }}
+        - errorSet: {{ .errorSet }}
+          errorCodes: 
+          {{- range .errorCodes }}
+          - {{.}}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    
+    ingress-scg: 
+      server:
+        pingDelayDuration: {{ .Values.pingDelay }}
+        enableincominghttp: {{ .Values.enableIncomingHttp }}
+        enableincominghttp1: {{ .Values.enableIncomingHttp1 | default false }}
+        enabletlsincominghttp1: {{ .Values.enableTLSIncomingHttp1 | default false }}
+        port: {{.Values.ports.containerPort }}
+        sslport:  {{.Values.ports.containersslPort }}
+        http1Port: {{ .Values.containerHttp1Port | default 8888 }}
+      ssl:
+        enableincominghttps: {{ .Values.enableIncomingHttps }}
+        enableoutgoinghttps: {{ .Values.enableOutgoingHttps }}
+        needClientAuth: {{ .Values.needClientAuth }}
+        {{- if or  .Values.enableOutgoingHttps .Values.enableIncomingHttps }}
+        enabled: true
+        {{- else }}
+        enabled: false
+        {{- end }}
+        {{- if or  .Values.enableOutgoingHttps .Values.enableIncomingHttps .Values.enableTLSIncomingHttp1 }}
+        {{- $valid := .Values.allowedCipherSuites }}  
+        ciphers:
+        {{- range .Values.cipherSuites }}
+           {{- if not (has . $valid)}}
+             {{- $cipher := printf "%s%s" . "-invalid or unsupported cipher" }}
+    
+             {{- fail $cipher }}
+           {{- end }}
+           - {{.}}
+        {{- end }}
+        key-store:
+          path: /configinfo/KeyStore.jks
+          secretName: {{ .Values.service.ssl.keyStorePassword.k8SecretName }}
+          secretNameSpace: {{ .Values.service.ssl.keyStorePassword.k8NameSpace }}
+          passFile: {{ .Values.service.ssl.keyStorePassword.fileName }}
+        trust-store:
+          path: /configinfo/TrustStore.jks
+          secretName: {{ .Values.service.ssl.trustStorePassword.k8SecretName }}
+          secretNameSpace: {{ .Values.service.ssl.trustStorePassword.k8NameSpace }}
+          passFile: {{ .Values.service.ssl.trustStorePassword.fileName }}
+        {{- end }}
+    cfg-server:
+      enabled: {{ .Values.cfgServer.enabled }}
+    
+    {{- if or .Values.global.lciHeaderConfig.enabled .Values.global.ociHeaderConfig.enabled }}
+    perfInfoSchedulerEnabled: true
+    backend-svc-config:
+      svcToSvcInstanceIdMapping:
+    {{- range .Values.global.svcToSvcInstanceIdMapping }}
+      - svcName: {{ .svcName | quote }}
+        serviceInstanceId: {{ .serviceInstanceId | quote }}
+    {{- end }}
+    perf-info-config:
+      pollingInterval: {{ .Values.global.perfInfoConfig.pollingInterval | quote }}
+      perfInfoSvcHost: {{ template "service.perfInfoServiceFullName" .}}
+      perfInfoSvcPort: {{ .Values.global.perfInfoConfig.port | quote }}
+      perfInfoRequestMap: {{ .Values.global.perfInfoConfig.perfInfoRequestMap | quote }}
+    {{- else }}
+    perfInfoSchedulerEnabled: false
+    {{- end }}
+    
+    lci-header-config:
+      enabled: {{ .Values.global.lciHeaderConfig.enabled }}
+    {{- if .Values.global.lciHeaderConfig.enabled }}
+      loadThreshold: {{ .Values.global.lciHeaderConfig.loadThreshold | quote }}
+      localLciHeaderValidity: {{ .Values.global.lciHeaderConfig.localLciHeaderValidity | quote }}
+      producerSvcIdHeader: {{ .Values.global.lciHeaderConfig.producerSvcIdHeader | quote }}
+    {{- end }}
+    
+    oci-header-config:
+      enabled: {{ .Values.global.ociHeaderConfig.enabled }}
+    {{- if .Values.global.ociHeaderConfig.enabled }}
+      validityPeriod: {{ .Values.global.ociHeaderConfig.validityPeriod | quote }}
+      producerSvcIdHeader: {{ .Values.global.ociHeaderConfig.producerSvcIdHeader | quote }}
+      overloadConfigRange:
+        minor: {{ .Values.global.ociHeaderConfig.overloadConfigRange.minor | quote }}
+        major: {{ .Values.global.ociHeaderConfig.overloadConfigRange.major | quote }}
+        critical: {{ .Values.global.ociHeaderConfig.overloadConfigRange.critical | quote }}
+      reductionMetrics:
+        minor: {{ .Values.global.ociHeaderConfig.reductionMetrics.minor | quote }}
+        major: {{ .Values.global.ociHeaderConfig.reductionMetrics.major | quote }}
+        critical: {{ .Values.global.ociHeaderConfig.reductionMetrics.critical | quote }}
+    {{- end }}
+
+    bucket-configuration:
+      minimumTokenRequest: {{ .Values.bucketConfiguration.minimumTokenRequest | quote }}
+      maximumTokenRequest: {{ .Values.bucketConfiguration.maximumTokenRequest | quote }}
+      incrementalCounter: {{ .Values.bucketConfiguration.incrementalCounter | quote }}
+    enableControlledShutdown: {{ .Values.enableControlledShutdown }}
+    controlledShutdownConfigMode: {{ .Values.controlledShutdownConfigMode | quote }}
+    {{- if .Values.controlledShutdownErrorMapping }}
+    controlledShutdownErrorMapping:
+      routeErrorProfileList:
+      {{- range .Values.controlledShutdownErrorMapping.routeErrorProfileList }}
+        - routeId: {{ .routeId }}
+          errorProfileName: {{ .errorProfileName | quote }}    
+      {{- end }}
+    {{- end }}
+    {{- if .Values.errorCodeProfilesList }}
+    errorCodeProfilesList:
+      errorCodeProfiles:
+      {{- range .Values.errorCodeProfilesList.errorCodeProfiles }}
+        - name: {{ .name | quote }}
+          errorCode: {{ .errorCode }}
+          errorCause: {{ .errorCause | quote }}
+          errorTitle: {{ .errorTitle | quote }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+          errorDescription: {{ .errorDescription | quote }}
+      {{- end }}
+    {{- end }}    
+    #server:
+    #  port: {{ .Values.ports.containerPort }}
+    #  {{- if  .Values.service.httpsEnabled }} 
+    #  http2:
+    #    enabled: true
+    #  ssl:
+    #    enabled: true
+    #    client-auth: need
+    #    key-store-type: JKS
+    #    key-store: /configinfo/KeyStore.jks 
+    #    key-store-password: {{ .Values.service.ssl.keyStorePass }}
+    #{{- if  eq .Values.service.ssl.initialAlgorithm "RSA256" }} 
+    #    key-alias: rsakey
+    #{{- end }}   
+    #{{- if  eq .Values.service.ssl.initialAlgorithm "ES256" }} 
+    #    key-alias: ecdsakey
+    #{{- end }}   
+    #   trust-store-type: JKS
+    #    trust-store: /configinfo/TrustStore.jks
+    #    trust-store-password: {{ .Values.service.ssl.trustStorePass }}
+    #    protocol: TLS  
+    #    enabled-protocols: {{ .Values.service.ssl.tlsVersion }}
+    #    ciphers : {{ .Values.service.ssl.supportedCipherSuiteList }} 
+    #{{- end }}   
+    
+    
+    {{- if  .Values.jaegerTracingEnabled }} 
+    opentracing :
+      jaeger:
+        enable-b3-propagation: {{ .Values.openTracing.jaeger.enableb3Propagation }}
+        enabled: {{ .Values.jaegerTracingEnabled }}
+        udp-sender: 
+          host: {{ .Values.openTracing.jaeger.udpSender.host | quote}}
+          port:  {{ .Values.openTracing.jaeger.udpSender.port }}
+        probabilistic-sampler: 
+          sampling-rate: {{ .Values.openTracing.jaeger.probabilisticSampler }} 
+    {{- end }}
+    
+    {{- if  .Values.jaegerTelemetryTracingEnabled }} 
+    openTelemetry :
+      jaeger:
+        enabled: {{ .Values.jaegerTelemetryTracingEnabled }}
+        udp-sender: 
+          host: {{ .Values.openTelemetry.jaeger.udpSender.host | quote}}
+          port:  {{ .Values.openTelemetry.jaeger.udpSender.port }}
+        probabilistic-sampler: 
+          sampling-rate: {{ .Values.openTelemetry.jaeger.probabilisticSampler }} 
+    {{- end }}
+
+    # flag to indicate config is been read in k8s environment
+    configMapReadIndicator: true
+    {{- if .Values.podProtectionConfigMode }}
+    pod-protection-config-mode: {{ .Values.podProtectionConfigMode }}
+    {{- else }}
+    pod-protection-config-mode: "HELM"
+    {{- end }}
+    {{- if  .Values.podProtection }}
+    pod-protection:
+      {{- if  .Values.podProtection.enabled }}
+      enabled: {{ .Values.podProtection.enabled }}
+      monitoringInterval: {{ .Values.podProtection.monitoringInterval }}
+      congestionControl:
+        enabled: {{ .Values.podProtection.congestionControl.enabled }}
+        stateChangeSampleCount: {{ .Values.podProtection.congestionControl.stateChangeSampleCount }}
+        actionSamplingPeriod: {{ .Values.podProtection.congestionControl.actionSamplingPeriod }}
+        states:
+         {{- range .Values.podProtection.congestionControl.states }}
+         - name: {{ .name }}
+           weight: {{ .weight }}
+           {{- if  .resourceThreshold }} 
+           resourceThreshold:
+             {{- if .resourceThreshold.cpu }}
+             cpu: {{ .resourceThreshold.cpu }}
+             {{- end }}
+             {{- if .resourceThreshold.memory }}
+             memory: {{ .resourceThreshold.memory }}
+             {{- end }}
+             {{- if .resourceThreshold.pendingMessage }}
+             pendingMessage: {{ .resourceThreshold.pendingMessage }}
+             {{- end }}
+           {{- end}}
+           entryAction:
+           {{- range .entryAction }}
+             - action: {{ .action }}
+               args:
+               {{- range $key, $value := .args }}
+                 {{ $key }}: {{ $value }}
+               {{- end}}
+           {{- end }}
+         {{- end }}
+      {{- else }}
+      enabled: false
+      {{- end }}
+    {{- end }}    
+    
+    #global NF Configurations:
+    {{- if .Values.global.nfInstanceId }}
+    nfInstanceId: {{ .Values.global.nfInstanceId | quote }}
+    {{- end }}
+    {{- if .Values.global.nfType }}
+    nfType: {{ .Values.global.nfType | quote }}
+    {{- end }}
+    {{- if .Values.global.nfFqdn }}
+    nfFqdn: {{ .Values.global.nfFqdn | quote }}
+    {{- end }}
+
+    #message-copy related configuration
+    {{- if .Values.messageCopy }}
+    {{- $trustStoreSecret := .Values.service.ssl.trustStorePassword.k8SecretName -}}
+    {{- $trustStoreNs := .Values.service.ssl.trustStorePassword.k8NameSpace -}}
+    {{- $trustStorefileName := .Values.service.ssl.trustStorePassword.fileName -}}
+    {{- with .Values.messageCopy }}
+    message-copy:
+     enabled: {{ .enabled | default false }}
+     copyPayload: {{ .copyPayload | default false }}
+     topicName: {{ .topicName | quote }}
+     ackRequired: {{ .ackRequired | default false }}
+     retryOnFailure: {{ .retryOnFailure | default 0 }}
+     {{- with .security }}
+     security:
+      enabled: {{ .enabled | default false }}
+      protocol: {{ .protocol | default "SASL_SSL" }}
+      tlsVersion: {{ .tlsVersion | default "TLSv1.2" }}
+      trustStore:
+       path: /configinfo/TrustStore.jks
+       password:
+        k8SecretName: {{ $trustStoreSecret }}
+        k8NameSpace: {{ $trustStoreNs }}
+        fileName: {{ $trustStorefileName }}
+      sasl:
+       userName: {{ .saslConfiguration.userName }}
+       password:
+        k8SecretName: {{ .saslConfiguration.password.k8SecretName }}
+        k8NameSpace: {{ .saslConfiguration.password.k8NameSpace }}
+        fileName: {{ .saslConfiguration.password.fileName }}
+     {{- end }}
+     threadPoolConfigurations:
+      coreSize: {{ .threadPoolConfigurations.coreSize | default 8 }}
+      maxSize: {{ .threadPoolConfigurations.maxSize | default 8 }}
+      queueCapacity: {{ .threadPoolConfigurations.queueCapacity | default 1000 }}
+     faultTolerance:
+      base: {{ .faultTolerance.base | default 120000 }}
+      limit: {{ .faultTolerance.limit | default 960000 }}
+      resetAfter: {{ .faultTolerance.resetAfter | default 1500000 }}
+    {{- end }}
+    {{- end }}
+    
+    #kafka related configuration
+    {{- if .Values.messageCopy }}
+    {{- if and .Values.messageCopy.enabled .Values.kafka }}
+    kafka:
+     bootstrapAddress: {{ .Values.kafka.bootstrapAddress | quote }}
+    {{- end }}
+    {{- end }}
+    
+    {{- if .Values.copyHeaderConfigMode}}
+    copy-header-config-mode: {{ .Values.copyHeaderConfigMode }}
+    {{- end }}
+    #Copy Request Header into Response On Gateway Generated Error
+    {{- if .Values.copyHeaderOnGatewayError }}
+    copy-header-on-gateway-error:
+     enabled: {{ .Values.copyHeaderOnGatewayError.enabled }}
+    {{- if .Values.copyHeaderOnGatewayError.requestToResponse }}
+    {{- if .Values.copyHeaderOnGatewayError.requestToResponse.requestHeaderNames }}
+     requestToResponse:
+      requestHeaderNames: 
+      {{- range .Values.copyHeaderOnGatewayError.requestToResponse.requestHeaderNames }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- end }}

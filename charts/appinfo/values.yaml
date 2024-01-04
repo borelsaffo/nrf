@@ -1,0 +1,303 @@
+global:
+  servicePorts:
+      appInfoHttp: 5906
+  containerPorts:
+      monitoringHttp: 9000
+      appInfoHttp: 5906
+  cncMetricsName: cnc-metrics
+  imagePullPolicy: IfNotPresent
+  exposeObservabilityAtService: false
+  nfInstanceId: "NA"
+  performanceServiceEnable: false
+  hookValidation:
+    infraValidate: false
+
+  # Docker Registry's Host or IP from where container images will be pulled.
+  dockerRegistry: ocpm
+  appinfoServiceEnable: true
+  nfType: PCF
+  enableControlledShutdown: false
+  #Multiple IGW Enabled:
+  multipleIgwEnabled: false
+  serviceAccountName: ''
+  logStorage: 0 #default calculated value 70
+  crictlStorage: 0 #default calculated value 1
+  #Resource Values for Hook Jobs
+  hookJobResources:
+     limits:
+       cpu: 2
+       memory: 2Gi
+     requests:
+       cpu: 1
+       memory: 1Gi
+
+  # ********  Sub-Section Start: Custom Extension Global Parameters ********
+  #**************************************************************************
+
+  customExtension:
+    allResources:
+      labels: {}
+      annotations: {}
+
+    lbServices:
+      labels: {}
+      annotations: {}
+
+    lbDeployments:
+      labels: {}
+      annotations: {}
+
+    nonlbServices:
+      labels: {}
+      annotations: {}
+
+    nonlbDeployments:
+      labels: {}
+      annotations: {}
+
+  # ********  Sub-Section End: Custiom Extensions Global Parameters ********
+  #**************************************************************************
+
+
+  # ********  Sub-Section Start: Prefix/Suffix Global Parameters ************
+  #**************************************************************************
+
+  k8sResource:
+    container:
+      prefix:
+      suffix:
+
+  metricPrefix: ''
+  metricSuffix: ''
+
+  # ********  Sub-Section End: Prefix/Suffix Global Parameters *************
+  #**************************************************************************
+  
+  # Following variables could be replaced from one-click-cnpolicy process
+  dbHookImageVersion: &dbHookImageVersion '23.2.2'
+  debugToolsImageVersion: &debugToolsImageVersion '23.2.0'
+
+  # ******** Debug tools ********
+  #**************************************************************************
+
+  debugTools:
+    image: "ocdebug-tools"
+    imageTag: *debugToolsImageVersion
+
+  # Allowed Values: DISABLED, ENABLED
+  # Preference is to set  "resources" request and limit to same values to avoid HPA issues.
+  extraContainers: DISABLED
+  debugToolContainerMemoryLimit: 4Gi
+  extraContainersVolumesTpl: |
+    - name: debug-tools-dir
+      emptyDir:
+        medium: Memory
+        sizeLimit: {{ .Values.global.debugToolContainerMemoryLimit | quote }}
+  extraContainersTpl: |
+      - command:
+          - /bin/sleep
+          - infinity
+        image: {{ .Values.global.dockerRegistry }}/{{ .Values.global.debugTools.image }}:{{ .Values.global.debugTools.imageTag }}
+        imagePullPolicy: IfNotPresent
+        name: {{ printf "%s-tools-%s" (include "getprefix" .) (include "getsuffix" .) | trunc 63 | trimPrefix "-" | trimSuffix "-"  }}
+        resources:
+          requests:
+            ephemeral-storage: "512Mi"
+            cpu: "0.5"
+            memory:  {{ .Values.global.debugToolContainerMemoryLimit | quote }}
+          limits:
+            ephemeral-storage: "512Mi"
+            cpu: "0.5"
+            memory: {{ .Values.global.debugToolContainerMemoryLimit | quote }}
+        securityContext:
+          allowPrivilegeEscalation: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_RAW
+            - NET_ADMIN
+          runAsUser: 7000
+        volumeMounts:
+        - mountPath: /tmp/tools
+          name: debug-tools-dir
+
+
+  nodeSelector: {}
+  tolerations: []
+
+  k8sResources:
+    hpat:
+      supportedVersions:
+        - autoscaling/v2beta2
+        - autoscaling/v2beta1
+        - autoscaling/v2
+        - autoscaling/v1
+    pdb:
+      supportedVersions:
+        - policy/v1
+        - policy/v1beta1
+
+image: occnp/oc-app-info
+imageTag: 23.2.0
+replicas: 1
+#loadShaddingEnabled: false
+#prometheusURL: prometheus.istio-system.svc.cluster.local:9090
+#topic: NRF.UDR
+#nrfURL: ''
+debug: false
+watchMySQL: false
+replicationStatusCheck: false
+scrapeInterval: 5
+readRetryAttempts: 20
+readRetryInterval: 0.005
+dbStatusUri: http://occne-db-monitor-svc.occne-infra:8080/db-tier/status/local
+dbTierVersionUri: ""
+realtimeDbStatusUri: http://occne-db-monitor-svc.occne-infra:8080/db-tier/status/cluster/local/realtime
+replicationUri: http://occne-db-monitor-svc.occne-infra:8080/db-tier/status/replication
+replicationInterval: 30
+infraServices: []
+
+##core_service can be defined null. And the definition of "null" is just as bellow:
+#core_service: {}
+##  
+core_services: {}
+controlled_shutdown:
+  operationlStateResourcePath: "/igw/applicationparams"
+
+serviceMeshCheck: false
+istioSidecarQuitUrl: "http://127.0.0.1:15000/quitquitquit"
+istioSidecarReadyUrl: "http://127.0.0.1:15000/ready"
+
+resources:
+  limits: 
+    cpu: 200m
+    memory: 1Gi
+    ephemeralStorage: 1Gi
+  requests:
+    cpu: 200m
+    memory: 1Gi
+
+startupProbe:
+  initialDelaySeconds: 20
+  timeoutSeconds: 3
+  periodSeconds: 15
+  successThreshold: 1
+  failureThreshold: 10
+
+readinessProbe:
+  initialDelaySeconds: 10
+  timeoutSeconds: 3
+  periodSeconds: 10
+  successThreshold: 1
+  failureThreshold: 10
+
+livenessProbe:
+  initialDelaySeconds: 20
+  timeoutSeconds: 3
+  periodSeconds: 15
+  successThreshold: 1
+  failureThreshold: 10
+
+service:
+  type: ClusterIP
+  port: 0
+
+  customExtension:
+    labels: {}
+    annotations: {}
+
+deployment:
+  customExtension:
+    labels: {}
+    annotations: {}
+
+fullnameOverride: ocpm-app-info
+
+app:
+  namespace: ''
+  namePrefix: ''
+
+extraContainers: USE_GLOBAL_VALUE
+gunicornTimeout: 90
+
+# Config client configuration
+commonCfgClient:
+  enabled: true
+commonCfgServer:
+  # If below parameter is present then it will be used for integrating with config-server.
+  # This parameter will be appended with the current release name when deployed with alternate-route
+  # In case host name is expected, then leave this parameter blank
+  configServerSvcName: occnp-config-mgmt
+  host: 10.113.78.180
+  port: 8000
+  pollingInterval: 5000 #(in ms)
+  connectionTimeout: 10000 #(in ms)
+commonServiceName: app-info
+
+dbHookImage:
+  name: common_config_hook
+  tag: *dbHookImageVersion
+  pullPolicy: IfNotPresent
+
+probeValidationByPass:
+  enabled: false
+
+# Db Hook Configuration
+dbConfig:
+  dbHost: data-mysql.default
+  dbPort: 3306
+  configFile: defaultconfig.yaml
+  schemaFile: defaultschema.json
+  secretName: dbhook-secret
+  dbName: commonconfig
+  # Name of the Key configured for "DB Username" in Secret with following name: "<dbConfig.secretName>"
+  dbUNameLiteral: dbUsername
+  # Name of the Key configured for "DB Password" in Secret with following name: "<dbConfig.secretName>"
+  dbPwdLiteral: dbPassword
+  #Db hook Configuration
+  dbEngine: NDBCLUSTER
+
+perfinfo:
+  port: 8000
+prometheusUrl: ''
+alertmanagerUrl: ''
+#Values for CNE 1.8 {tagNamespace: kubernetes_namespace}
+#Values for CNE 1.9 {tagNamespace: namespace}
+tagNamespace: kubernetes_namespace
+
+log:
+  level:
+    appinfo: WARN
+  
+gracefulShutdown:
+  gracePeriod: 30s
+  defaultErrorCode: 503
+
+
+#The sidecar (istio url) when deployed in serviceMesh
+# Default value: http://127.0.0.1:15020/quitquitquit
+istioSidecarQuitUrl: ""
+# Default value: http://127.0.0.1:15020/ready
+istioSidecarReadyUrl: ""
+#Enabled when deployed in serviceMesh
+serviceMeshCheck: false
+
+# nodeSelector can be defined as:
+# nodeSelector:
+#   key: value
+helmBasedConfigurationNodeSelectorApiVersion: "v2"
+nodeSelector: {}
+tolerations: []
+
+minReplicas: 1
+maxReplicas: 2
+averageCpuUtil: 80
+maxUnavailable: '20%'
+pdbMaxUnavailable: ''
+# Values for infra Validation
+minViablePath: 1.15.0
+minKubernetesVersion: 1.21
+minDbTierVersion: 22.1.0
+
+

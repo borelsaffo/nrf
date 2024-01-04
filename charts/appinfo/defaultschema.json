@@ -1,0 +1,263 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "sample config json",
+	"description": "json validator",
+	"type": "object",
+	"properties": {
+		"logging": {
+			"type": "object",
+			"description": "An explanation about the purpose of this instance.",
+			"properties": {
+				"appLogLevel": {
+					"enum": [
+						"CRITICAL",
+						"FATAL",
+						"ERROR",
+						"WARN",
+						"WARNING",
+						"INFO",
+						"DEBUG",
+						"TRACE"
+					],
+					"type": "string",
+					"description": "An explanation about the purpose of this instance."
+				},
+				"packageLogLevel": {
+					"type": "array",
+					"minItems": 0,
+					"maxItems": 6,
+					"uniqueItems": true,
+					"items": {
+						"anyOf": [
+							{
+								"type": "object",
+								"properties": {
+									"packageName": {
+										"enum": [
+											"namespace_runtime_info",
+											"service_monitor",
+											"mysql_monitor",
+											"replication_status_monitor",
+											"service_status_scraper",
+											"log_level_agent"
+										],
+										"type": "string",
+										"description": "An explanation about the purpose of this instance."
+									},
+									"logLevelForPackage": {
+										"enum": [
+											"CRITICAL",
+											"FATAL",
+											"ERROR",
+											"WARN",
+											"WARNING",
+											"INFO",
+											"DEBUG",
+											"TRACE"
+										],
+										"type": "string",
+										"description": "An explanation about the purpose of this instance."
+									}
+								},
+								"required": [
+									"packageName",
+									"logLevelForPackage"
+								],
+								"description": "An explanation about the purpose of this instance."
+							}
+						]
+					},
+					"description": "An explanation about the purpose of this instance."
+				}
+			},
+			"required": [
+				"appLogLevel"
+			]
+		},
+		"nfScoring": {
+			"type": "object",
+			"description": "NF scoring configuration.",
+			"properties": {
+				"enableNFScoring": {
+					"type": "boolean",
+					"description": "flag used to enable and disable NF Scoring feature"
+				},
+				"tps": {
+					"type": "object",
+					"description": "TPS data.",
+					"required": ["enable"],
+					"properties": {
+						"enable": {
+							"type": "boolean"
+						},
+						"maxScore": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100,
+							"default": 20
+						},
+						"maxTps": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 1000000
+						}
+					},
+					"additionalProperties": false
+				},
+				"serviceHealth": {
+					"type": "object",
+					"description": "Service Health data.",
+					"required": ["enable"],
+					"properties": {
+						"enable": {
+							"type": "boolean"
+						},
+						"maxScore": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100,
+							"default": 30
+						}
+					},
+					"additionalProperties": false
+				},
+				"signallingConnections": {
+					"type": "object",
+					"description": "Signalling Connections data.",
+					"required": ["enable"],
+					"properties": {
+						"enable": {
+							"type": "boolean"
+						},
+						"maxScore": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100,
+							"default": 20
+						},
+						"maxConnections": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 10000
+						}
+					},
+					"additionalProperties": false
+				},
+				"replicationHealth": {
+					"type": "object",
+					"description": "Replication Health data.",
+					"required": ["enable"],
+					"properties": {
+						"enable": {
+							"type": "boolean"
+						},
+						"maxScore": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100,
+							"default": 30
+						}
+					},
+					"additionalProperties": false
+				},
+				"localitySitePreference": {
+					"type": "object",
+					"description": "Locality and Site Preference data.",
+					"required": ["enable"],
+					"properties": {
+						"enable": {
+							"type": "boolean"
+						},
+						"score": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 100,
+							"default": 5
+						}
+					},
+					"additionalProperties": false
+				},
+				"activeAlert": {
+					"type": "object",
+					"description": "Active Alert Weightage.",
+					"required": ["enable"],
+					"properties": {
+						"enable": {
+							"type": "boolean"
+						},
+						"criticalAlertWeightage": {
+							"type": "integer",
+							"minimum": 0,
+							"maximum": 100,
+							"default": 2
+						},
+						"majorAlertWeightage": {
+							"type": "integer",
+							"minimum": 0,
+							"maximum": 100,
+							"default": 1
+						},
+						"minorAlertWeightage": {
+							"type": "integer",
+							"minimum": 0,
+							"maximum": 100,
+							"default": 0
+						}
+					},
+					"additionalProperties": false
+				},
+				"customCriteria": {
+					"type": "array",
+					"description": "list of custom criterias",
+					"items": {
+						"type": "object",
+						"description": "Data related to custom criteria",
+						"properties": {
+							"enable": {
+								"type": "boolean"
+							},
+							"name": {
+								"type": "string"
+							},
+							"metricName": {
+								"type": "string"
+							},
+							"scoringType": {
+								"type": "string"
+							},
+							"maxScore": {
+								"type": "integer",
+								"minimum": 1,
+								"maximum": 100,
+								"default": 30
+							},
+							"maxValue": {
+								"type": "integer",
+								"minimum": 1,
+								"maximum": 10000
+							},
+							"weightage": {
+								"type": "integer",
+								"minimum": 0,
+								"maximum": 100,
+								"default": 1
+							}
+						}
+					},
+					"required": ["enable"]
+				}
+			},
+			"additionalProperties": false,
+			"required": [
+				"enableNFScoring",
+				"tps",
+				"serviceHealth",
+				"signallingConnections",
+				"replicationHealth",
+				"localitySitePreference",
+				"activeAlert"
+
+			]
+		}
+	}
+}

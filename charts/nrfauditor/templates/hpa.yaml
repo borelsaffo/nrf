@@ -1,0 +1,117 @@
+# Copyright 2022 (C), Oracle and/or its affiliates. All rights reserved.
+
+{{- if and (has "autoscaling/v2" $.Values.global.supportedVersions) (.Capabilities.APIVersions.Has "autoscaling/v2/HorizontalPodAutoscaler") }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ template "hpautoscalar.fullname" .}}-v2
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ template "deployment.fullname" . }}
+  minReplicas: {{ .Values.minReplicas }}
+  maxReplicas: {{ .Values.maxReplicas }}
+  metrics: 
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+          type: Utilization
+          averageUtilization: {{ .Values.resources.target.averageCpuUtil }} 
+{{- else if and (has "autoscaling/v2beta2" $.Values.global.supportedVersions) (.Capabilities.APIVersions.Has "autoscaling/v2beta2/HorizontalPodAutoscaler") }}
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ template "hpautoscalar.fullname" .}}-v2beta2
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ template "deployment.fullname" . }}
+  minReplicas: {{ .Values.minReplicas }}
+  maxReplicas: {{ .Values.maxReplicas }}
+  metrics: 
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+          type: Utilization
+          averageUtilization: {{ .Values.resources.target.averageCpuUtil }} 
+{{- else if and (has "autoscaling/v2beta1" $.Values.global.supportedVersions) (.Capabilities.APIVersions.Has "autoscaling/v2beta1/HorizontalPodAutoscaler") }}
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ template "hpautoscalar.fullname" .}}-v2beta1
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ template "deployment.fullname" . }}
+  minReplicas: {{ .Values.minReplicas }}
+  maxReplicas: {{ .Values.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      targetAverageUtilization: {{ .Values.resources.target.averageCpuUtil }}
+{{- else if and (has "autoscaling/v1" $.Values.global.supportedVersions) (.Capabilities.APIVersions.Has "autoscaling/v1/HorizontalPodAutoscaler") }}
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ template "hpautoscalar.fullname" .}}-v1
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ template "deployment.fullname" . }}
+  minReplicas: {{ .Values.minReplicas }}
+  maxReplicas: {{ .Values.maxReplicas }}
+  metrics: 
+  - type: Resource
+    resource:
+      name: cpu
+      targetAverageUtilization: {{ .Values.resources.target.averageCpuUtil }}
+{{- else }}
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ template "hpautoscalar.fullname" .}}-v2beta1
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ template "deployment.fullname" . }}
+  minReplicas: {{ .Values.minReplicas }}
+  maxReplicas: {{ .Values.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      targetAverageUtilization: {{ .Values.resources.target.averageCpuUtil }}
+{{- end }}

@@ -1,0 +1,119 @@
+# Copyright 2022 (C), Oracle and/or its affiliates. All rights reserved.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "configmap.fullname" . }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+data:
+  APP_NAME: {{ .Values.global.app_name }}
+  VENDOR: {{ .Values.global.vendor }}
+  LOG_LEVEL: {{ .Values.log.level }}
+  LOG_LEVEL_SYSTEM:  {{ .Values.global.systemLoggingLevel }}
+  LOG_LOCATION_INFO: {{ .Values.log.logLocationInfo | quote }}
+  LOG4J2_BURST_RATE: {{ .Values.log.burst.rate | quote }}
+  LOG4J2_BURST_MAX: {{ .Values.log.burst.max | quote }}
+  CONSOLE_FORMAT:  {{ .Values.log.consoleFormat | quote }}
+  MICROSERVICE_NAME: {{ template "service.fullname" . }}
+  ENGINEERING_VERSION: {{.Chart.Version}}
+  MARKETING_VERSION: {{.Chart.AppVersion}}
+  NRF_LEVEL: {{ .Values.global.nrfInstanceId | quote }}
+  MYSQL_PRIMARY_HOST: {{ .Values.global.mysql.primary.host }}
+  MYSQL_SECONDARY_HOST: {{ .Values.global.mysql.secondary.host | quote }}
+  MYSQL_PRIMARY_PORT: {{ .Values.global.mysql.primary.port | quote }}
+  MYSQL_SECONDARY_PORT: {{ .Values.global.mysql.secondary.port | quote }}
+
+  AUDIT_HIKARI_POOL_SIZE: {{ .Values.hikariPoolSize | quote}}
+  AUDIT_HIKARI_CONNECTION_TIMEOUT: {{ .Values.hikariConnectionTimeout | quote }}
+  AUDIT_HIKARI_MINIMUM_IDLE: {{ .Values.hikariMinimumIdle | quote }}
+  AUDIT_HIKARI_IDLE_TIMEOUT: {{ .Values.hikariIdleTimeout | quote }}
+  AUDIT_HIKARI_MAX_LIFETIME: {{ .Values.hikariMaxLifetime | quote }}
+
+  
+  AUDIT_WAIT_TIME: {{ .Values.audit.waitTime | quote}}
+  SUB_AUDIT_INT: {{ .Values.audit.subInt | quote}}
+  HB_AUDIT_INT: {{ .Values.audit.hbInt | quote}}
+  HB_REMOTE_AUDIT_INT: {{ .Values.audit.hbRemoteInt | quote}}
+  NF_AUDIT_INT: {{ .Values.audit.nfInt | quote}}
+  SUB_REMOTE_AUDIT_INT: {{ .Values.audit.subRemoteInt | quote}}
+  NRF_EVENT_AUDIT_INT: {{ .Values.audit.nrfEventInt | quote}}
+  
+  REG_SVC_HOST: {{ template "registration.service.fullname" .}}
+  REG_SVC_PORT: {{ .Values.global.nfregistration.portConfiguration.servicePort | quote }}
+  SUB_SVC_HOST: {{ template "subscription.service.fullname" . }}
+  SUB_SVC_PORT: {{ .Values.global.nfsubscription.portConfiguration.servicePort | quote }}
+  APP_INFO_SERVICE_NAME: {{ template "appinfo.service.fullname" . }}
+  APP_INFO_SERVICE_PORT: {{ .Values.global.servicePorts.appInfoHttp | quote }}
+  APP_INFO_CHECK_ENABLED: {{ .Values.global.appinfoCheckEnabled | quote }}
+  ENABLE_NRF_ARTISAN_SERVICE: {{ .Values.global.enableNrfArtisanService | quote }}
+  NAPTR_UPDATE_HOST: {{ template "artisan.service.fullname" . }}
+  NAPTR_UPDATE_PORT: {{ .Values.global.nrfartisan.portConfiguration.servicePort  | quote }}
+
+  #If set to true, replication status shall not be fetched and assumed to be active. Only for Internal Use
+  OVERRIDE_REPLICATION_CHECK: {{ .Values.global.overrideReplicationCheck | quote }}
+
+  DB_MONITOR_SVC_HOST: {{ .Values.global.dbMonitorSvcHost }}
+  DB_MONITOR_SVC_PORT: {{ .Values.global.dbMonitorSvcPort | quote }}
+
+  DATABASE_ENGINE: {{ .Values.global.databaseEngine | quote}}
+
+  APP_USER_SECRETKEY_NAMESPACE: {{ .Values.global.database.nameSpace }}
+  APP_USER_SECRETKEY_NAME: {{ .Values.global.database.appUserSecretName }}
+  NRF_INSTANCE_ID: {{ .Values.global.nrfInstanceId | quote }}
+  COMMON_SERVICE_PORT: {{ .Values.global.nrfauditor.portConfiguration.commonServicePort | quote }}
+  CONTAINER_PORT: {{ .Values.global.nrfauditor.portConfiguration.containerPort | quote }}
+  AUDIT_MAX_THREAD_POOL_SIZE: {{ .Values.threadConfig.maxThreadPoolSize | quote}}
+  AUDIT_CORE_THREAD_POOL_SIZE: {{ .Values.threadConfig.coreThreadPoolSize | quote}}
+  AUDIT_QUEUE_CAPACITY_SIZE: {{ .Values.threadConfig.queueCapacitySize | quote}}
+  # Leader Selection config for multi-pod support 
+  MULTI_POD_SUPPORT_ENABLED: {{ .Values.multipodsupportenabled  | quote  }}
+  LEADER_ELECTION_TABLE_NAME: {{ .Values.leaderelectiontablename  | quote  }}
+  PRIVILEGED_USER_SECRETKEY_NAMESPACE: {{ .Values.global.database.nameSpace }}
+  PRIVILEGED_USER_SECRETKEY_NAME: {{ .Values.global.database.privilegedUserSecretName }} 
+  MULTI_POD_SUPPORT_DB_NAME_LITERAL: {{.Values.global.database.leaderElectionDbName}}
+  MULTI_POD_SUPPORT_HB_TIMESTAMP_LIMT_TO_BE_LEADER: {{ .Values.multipodsupporthbtimestamplimttobeleader | quote  }}
+  MULTI_POD_SUPPORT_HB_TIMESTAMP_LIMT_TO_REMOVE_LEADER: {{ .Values.multipodsupporthbtimestamplimttoremoveleader | quote  }}
+  MULTI_POD_SUPPORT_HB_UPDATE_INTERVAL: {{ .Values.multipodsupporthbupdateinterval | quote  }}
+  MULTI_POD_DB_UNAME_LITERAL: {{ .Values.global.database.dbUNameLiteral }}
+  MULTI_POD_DB_PWD_LITERAL: {{ .Values.global.database.dbPwdLiteral }}
+  
+  
+  # DB Retry configuration
+  DB_RETRY_MAX_COUNT: {{ .Values.dbRetry.maxCount | quote}}
+  DB_RETRY_INTERVAL: {{ .Values.dbRetry.maxInterval | quote}}
+
+# Jetty client configuration
+  JETTY_MAX_CONCURRENT_PUSHEDSTREAMS: {{ .Values.jetty.maxConcurrentPushedStreams | quote}}
+  MAX_REQUESTS_QUEUED_PER_DESTINATION: {{ .Values.jetty.maxRequestsQueuedPerDestination | quote}}
+  MAX_CONNECTIONS_PER_DESTINATION: {{ .Values.jetty.maxConnectionsPerDestination | quote}}
+  MAX_CONNECTIONS_PER_IP: {{ .Values.jetty.maxConnectionsPerIp | quote}}
+  REQUEST_TIMEOUT: {{ .Values.jetty.request.timeout | quote}}
+  CONNECTION_TIMEOUT: {{ .Values.jetty.connectionTimeout | quote}}
+  IDLE_TIMEOUT: {{ .Values.jetty.idleTimeout | quote}}
+  DNS_REFRESH_DELAY: {{ .Values.jetty.dnsRefreshDelay | quote}}
+  PING_DELAY_DURATION: {{ .Values.jetty.pingDelay | quote}}
+  CONNECT_FAILURE_THRESHOLD: {{ .Values.jetty.connectionFailureThreshold | quote}}
+  SERVICE_MESH_CHECK: {{ template "servicemesh.check" . }}
+
+  #LOG_BASE_PATH: \{\{ .Values.logFile.basePath | quote }}
+  #LOG_FILE_NAME: \{\{ .Values.logFile.fileName | quote }}
+  #LOG_FILE_PATTERN: \{\{ .Values.logFile.filePattern | quote }}
+  #SIZE_BASED_TRIGGERING_POLICY_SIZE: \{\{ .Values.logFile.sizeBasedTriggeringPolicySize | quote }}
+  #DELETION_FILE_PATTERN: \{\{ .Values.logFile.deletionFilePattern | quote }}
+  #DELETION_CRITERIA_LAST_MODIFIED_TIME: \{\{ .Values.logFile.deletionCriteriaLastModifiedTime | quote }}
+  #DELETION_CRITERIA_FILE_SIZE: \{\{ .Values.logFile.deletionCriteriaFileSize | quote }}
+
+  # Watch Dog configuration
+  IS_THREAD_WATCHDOG_ENABLED: {{ .Values.watchDog.isThreadWatchDogEnabled | quote}}
+  WATCHDOG_FAILURE_RANGE: {{ .Values.watchDog.watchDogFailureRange | quote}}
+  WATCHDOG_THREAD_MAX_EXECUTION_TIME: {{ .Values.watchDog.watchDogThreadMaxExecutionTime | quote}}
+  WATCHDOG_MONITORING_INTERVAL: {{ .Values.watchDog.watchDogMonitoringInterval | quote}}
+
+  ENABLE_CONTROLLED_SHUTDOWN: {{ .Values.global.enableControlledShutdown | quote}}
+  OPERATIONAL_STATE_POLL_INTERVAL: {{ .Values.operationalStatePollInterval | quote }}
+  
+  AUDITOR_DOWNTIME_THRESHOLD: {{ .Values.auditorDowntimeThreshold | quote }}

@@ -1,0 +1,51 @@
+# Copyright 2022 (C), Oracle and/or its affiliates. All rights reserved.
+
+{{- if and (has "policy/v1" $.Values.global.supportedVersions) (.Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget") }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  annotations:
+    {{- include "annotations.allResources" . }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: Nnrf_NFAuditor
+  name: {{ template "service.fullname" . }}-v1
+spec:
+  maxUnavailable: {{ .Values.global.maxPdbUnavailable | quote }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "chart.fullname" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- else if and (has "policy/v1beta1" $.Values.global.supportedVersions) (.Capabilities.APIVersions.Has "policy/v1beta1/PodDisruptionBudget") }}
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  annotations:
+    {{- include "annotations.allResources" . }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: Nnrf_NFAuditor
+  name: {{ template "service.fullname" . }}-v1beta1
+spec:
+  maxUnavailable: {{ .Values.global.maxPdbUnavailable | quote }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "chart.fullname" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- else }}
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  annotations:
+    {{- include "annotations.allResources" . }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: Nnrf_NFAuditor
+  name: {{ template "service.fullname" . }}-v1beta1
+spec:
+  maxUnavailable: {{ .Values.global.maxPdbUnavailable | quote }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "chart.fullname" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

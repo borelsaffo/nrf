@@ -1,0 +1,103 @@
+# Copyright 2018 (C), Oracle and/or its affiliates. All rights reserved.
+
+global:
+  logStorage: 70
+  crictlStorage: 1
+  supportedVersions:
+    - autoscaling/v2
+    - autoscaling/v2beta2
+    - autoscaling/v2beta1
+    - autoscaling/v1
+    - policy/v1
+    - policy/v1beta1
+image:
+  name: ocnrf-nrfconfiguration
+  tag: 1.4.0
+  pullPolicy: Always
+
+service:
+  port:
+    http: 8080
+
+log:
+  level: WARN
+  burst:
+    rate: 750
+    max: 3000
+  logLocationInfo: false
+  consoleFormat: jsonConsole
+
+resources:
+  limits:
+     cpu: 2
+     memory: 2Gi
+  requests:
+    cpu: 2
+    memory: 2Gi
+  target:
+    averageCpuUtil: 80
+  
+minReplicas: 1
+maxReplicas: 1
+
+server:
+  maxConnections: 10000
+  queueSize: 100
+  maxThreads: 200
+  spareThreads: 20
+
+hikariPoolSize: 10
+
+
+dbRetry:
+  maxCount: 3
+  maxInterval: 200
+
+jetty:
+   maxConcurrentPushedStreams: 1000
+   maxRequestsQueuedPerDestination: 1024
+   maxConnectionsPerDestination: 4 
+   maxConnectionsPerIp: 4
+   request:
+      timeout: 4000
+   connectionTimeout: 10000
+   idleTimeout: 10000
+   dnsRefreshDelay: 120000
+   pingDelay: 30
+   connectionFailureThreshold: 10
+
+# Log files configuration
+#logFile:
+  # Path where log files will be generated
+  #basePath: ./logs/
+  # FileName in which latest logs will be present
+  #fileName: application.log
+  # The pattern of the file name of the archived log file
+  #filePattern: application-%d{MM-dd-yy-HH-mm-ss}-%i.log.gz
+  # Causes a rollover once the file has reached the specified size. With the suffix KB, MB or GB
+  #sizeBasedTriggeringPolicySize: 10MB
+  # Delete expression: deletionFilePattern && (deletionCriteriaLastModifiedTime || deletionCriteriaFileSize)
+  # Delete files whose name matches a regular expression
+  #deletionFilePattern: application-*.log.gz 
+  # Deletes files that are as old as or older than the specified duration
+  #deletionCriteriaLastModifiedTime: 20M
+  # Deletes after the accumulated file size threshold is exceeded during the file tree walk
+  #deletionCriteriaFileSize: 500 MB
+  
+# Watch Dog configuration  
+watchDog:
+  isThreadWatchDogEnabled: true
+  watchDogMonitoringInterval: 10000
+  watchDogFailureRange: 2,4,6
+# Thread Max-Execution Time should be max among idleTimeout & connectionTimeout of jetty config in milli seconds
+  watchDogThreadMaxExecutionTime: 65000
+  
+hooks:
+  preValidateEnabled: true  
+  postValidateEnabled: true
+  faultRecoveryMode: false
+  faultRecoveryValidate: true
+  nrfDbSchema: "{\"versions\":[{\"version\":\"0\",\"dbList\":[{\"dbName\":\"appDbName\",\"dbTableSchema\":[{\"tableName\":\"NfScreening\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nfScreeningRulesListType\"},{\"column\":\"nfScreeningType\"},{\"column\":\"nfScreeningRulesListStatus\"},{\"column\":\"nfScreeningJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"}]},{\"tableName\":\"NrfEventTransactions\",\"columns\":[{\"column\":\"recordCreator\"},{\"column\":\"creationTimestamp\"},{\"column\":\"eventDetails\"}]},{\"tableName\":\"NrfSystemOptions\",\"columns\":[{\"column\":\"configType\"},{\"column\":\"recordOwner\"},{\"column\":\"configurationJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"}]},{\"tableName\":\"SiteIdToNrfInstanceIdMapping\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nrfInstanceId\"},{\"column\":\"siteId\"}]}]},{\"dbName\":\"networkScopedDbName\",\"dbTableSchema\":[{\"tableName\":\"NfScreening_backup\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nfScreeningRulesListType\"},{\"column\":\"nfScreeningType\"},{\"column\":\"nfScreeningRulesListStatus\"},{\"column\":\"nfScreeningJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"releaseVersion\"}]},{\"tableName\":\"NrfSystemOptions_backup\",\"columns\":[{\"column\":\"configType\"},{\"column\":\"recordOwner\"},{\"column\":\"configurationJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"releaseVersion\"}]},{\"tableName\":\"SiteIdToNrfInstanceIdMapping_backup\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nrfInstanceId\"},{\"column\":\"siteId\"},{\"column\":\"releaseVersion\"}]}],\"tableConfiguration\":[{\"tableName\":\"NrfSystemOptions\"}]}]},{\"version\":\"2300100\",\"dbList\":[{\"dbName\":\"appDbName\",\"dbTableSchema\":[{\"tableName\":\"NfScreening\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nfScreeningRulesListType\"},{\"column\":\"nfScreeningType\"},{\"column\":\"nfScreeningRulesListStatus\"},{\"column\":\"nfScreeningJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"}]},{\"tableName\":\"NrfEventTransactions\",\"columns\":[{\"column\":\"recordCreator\"},{\"column\":\"creationTimestamp\"},{\"column\":\"eventDetails\"}]},{\"tableName\":\"NrfSystemOptions\",\"columns\":[{\"column\":\"configType\"},{\"column\":\"recordOwner\"},{\"column\":\"configurationJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"}]},{\"tableName\":\"SiteIdToNrfInstanceIdMapping\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nrfInstanceId\"},{\"column\":\"siteId\"}]}]},{\"dbName\":\"networkScopedDbName\",\"dbTableSchema\":[{\"tableName\":\"NfScreening_backup\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nfScreeningRulesListType\"},{\"column\":\"nfScreeningType\"},{\"column\":\"nfScreeningRulesListStatus\"},{\"column\":\"nfScreeningJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"releaseVersion\"}]},{\"tableName\":\"NrfSystemOptions_backup\",\"columns\":[{\"column\":\"configType\"},{\"column\":\"recordOwner\"},{\"column\":\"configurationJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"releaseVersion\"}]},{\"tableName\":\"SiteIdToNrfInstanceIdMapping_backup\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nrfInstanceId\"},{\"column\":\"siteId\"},{\"column\":\"releaseVersion\"}]}],\"tableConfiguration\":[{\"tableName\":\"NrfSystemOptions\"}]}]}]}"
+  nrfConfigSchema: "{\"versions\":[{\"version\":\"0\",\"dbList\":[{\"dbName\":\"appDbName\",\"dbTableConfig\":[{\"tableName\":\"NfScreening\",\"columnName\":\"nfScreeningRulesListType\",\"configuration\":[\"CALLBACK_URI\",\"NF_IP_ENDPOINT\",\"NF_FQDN\",\"NF_TYPE_REGISTER\",\"PLMN_ID\"]},{\"tableName\":\"NrfSystemOptions\",\"columnName\":\"configType\",\"configuration\":[\"CONTROLLED_SHUTDOWN_OPTIONS\",\"DNS_NAPTR_OPTIONS\",\"FORWARDING_OPTIONS\",\"GENERAL_OPTIONS\",\"GEOREDUNDANCY_OPTIONS\",\"LOG_LEVEL_OPTIONS\",\"NF_ACCESSTOKEN_OPTIONS\",\"NF_AUTHENTICATION_OPTIONS\",\"NF_DISCOVERY_OPTIONS\",\"NF_MANAGEMENT_OPTIONS\",\"NF_SCREENING_OPTIONS\",\"OCNRF_ENG_ERROR_RESPONSES\",\"OCNRF_ENG_SYSTEM_OPTIONS\",\"POD_PROTECTION_OPTIONS\",\"ROAMING_OPTIONS\",\"SLF_OPTIONS\"]}]}]},{\"version\":\"2300100\",\"dbList\":[{\"dbName\":\"appDbName\",\"dbTableConfig\":[{\"tableName\":\"NfScreening\",\"columnName\":\"nfScreeningRulesListType\",\"configuration\":[\"CALLBACK_URI\",\"NF_IP_ENDPOINT\",\"NF_FQDN\",\"NF_TYPE_REGISTER\",\"PLMN_ID\"]},{\"tableName\":\"NrfSystemOptions\",\"columnName\":\"configType\",\"configuration\":[\"DNS_NAPTR_OPTIONS\",\"FORWARDING_OPTIONS\",\"GENERAL_OPTIONS\",\"GEOREDUNDANCY_OPTIONS\",\"LOG_LEVEL_OPTIONS\",\"NF_ACCESSTOKEN_OPTIONS\",\"NF_AUTHENTICATION_OPTIONS\",\"NF_DISCOVERY_OPTIONS\",\"NF_MANAGEMENT_OPTIONS\",\"NF_SCREENING_OPTIONS\",\"OCNRF_ENG_ERROR_RESPONSES\",\"OCNRF_ENG_SYSTEM_OPTIONS\",\"POD_PROTECTION_OPTIONS\",\"ROAMING_OPTIONS\",\"SLF_OPTIONS\"]}]}]},{\"version\":\"2300200\",\"dbList\":[{\"dbName\":\"appDbName\",\"dbTableConfig\":[{\"tableName\":\"NfScreening\",\"columnName\":\"nfScreeningRulesListType\",\"configuration\":[\"CALLBACK_URI\",\"NF_IP_ENDPOINT\",\"NF_FQDN\",\"NF_TYPE_REGISTER\",\"PLMN_ID\"]},{\"tableName\":\"NrfSystemOptions\",\"columnName\":\"configType\",\"configuration\":[\"CONTROLLED_SHUTDOWN_OPTIONS\",\"DNS_NAPTR_OPTIONS\",\"FORWARDING_OPTIONS\",\"GENERAL_OPTIONS\",\"GEOREDUNDANCY_OPTIONS\",\"LOG_LEVEL_OPTIONS\",\"NF_ACCESSTOKEN_OPTIONS\",\"NF_AUTHENTICATION_OPTIONS\",\"NF_DISCOVERY_OPTIONS\",\"NF_MANAGEMENT_OPTIONS\",\"NF_SCREENING_OPTIONS\",\"OCNRF_ENG_ERROR_RESPONSES\",\"OCNRF_ENG_SYSTEM_OPTIONS\",\"POD_PROTECTION_OPTIONS\",\"ROAMING_OPTIONS\",\"SLF_OPTIONS\"]}]}]}]}"
+
+tolerations: []

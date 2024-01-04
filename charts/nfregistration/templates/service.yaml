@@ -1,0 +1,23 @@
+# Copyright 2022 (C), Oracle and/or its affiliates. All rights reserved.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "service.fullname" . }}
+
+  labels:
+    {{- include "labels.nonlbServices" . }}
+    app.kubernetes.io/component: Nnrf_NFManagement
+    category: ocnrf
+    io.kompose.service: {{ template "service.fullname" . }}
+  annotations:
+    {{- include "annotations.nonlbServices" . }}
+spec:
+  ports:
+  - port: {{ .Values.global.nfregistration.portConfiguration.servicePort }}
+    targetPort: {{ .Values.global.nfregistration.portConfiguration.containerPort }}
+    name: http2-sig
+  selector:
+    app.kubernetes.io/name: {{ template "chart.fullname" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    io.kompose.service:  {{ template "service.fullname" . }}
+  type: {{ .Values.service.type }}

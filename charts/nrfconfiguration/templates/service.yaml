@@ -1,0 +1,35 @@
+# copyright 2022 (C), Oracle and/or its affiliates. All rights reserved.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "service.fullname" . }}
+  labels:
+    {{- if .Values.global.cncConsoleDeployed }}
+    {{- include "labels.nonlbServices" . }}
+    {{- else }}
+    {{- include "labels.lbServices" . }}
+    {{- end }}
+    app.kubernetes.io/component: oam
+  annotations:
+    {{- if .Values.global.cncConsoleDeployed }}
+    {{- include "annotations.nonlbServices" . }}
+    {{- else }}
+    {{- include "annotations.lbServices" . }}
+    {{- end }}
+spec:
+  ports:
+  - port: {{ .Values.global.nrfconfiguration.portConfiguration.servicePort }}
+    targetPort: {{ .Values.global.nrfconfiguration.portConfiguration.containerPort }}
+    name: http2-oam
+    {{- if (not (.Values.global.cncConsoleDeployed)) }}
+    {{- if (.Values.service.staticNodePortEnabled) }}
+    nodePort: {{ .Values.service.staticNodePort }}
+    {{- end }}
+    {{- end }}
+  selector:
+    app.kubernetes.io/name: {{ template "chart.fullname" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  type: {{ .Values.service.type }}
+  {{- if .Values.service.staticIpAddressEnabled }}
+  loadBalancerIP: {{ .Values.service.staticIpAddress }}
+  {{- end }}

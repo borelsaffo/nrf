@@ -1,0 +1,53 @@
+apiVersion: v2
+appVersion: 23.2.0
+dependencies:
+- condition: nfregistration.enabled
+  name: nfregistration
+  repository: alias:helm-repo
+  version: 23.2.0
+- condition: nfsubscription.enabled
+  name: nfsubscription
+  repository: alias:helm-repo
+  version: 23.2.0
+- condition: nrfauditor.enabled
+  name: nrfauditor
+  repository: alias:helm-repo
+  version: 23.2.0
+- condition: nfdiscovery.enabled
+  name: nfdiscovery
+  repository: alias:helm-repo
+  version: 23.2.0
+- condition: nrfconfiguration.enabled
+  name: nrfconfiguration
+  repository: alias:helm-repo
+  version: 23.2.0
+- condition: nfaccesstoken.enabled
+  name: nfaccesstoken
+  repository: alias:helm-repo
+  version: 23.2.0
+- condition: global.enableNrfArtisanService
+  name: nrfartisan
+  repository: alias:helm-repo
+  version: 23.2.0
+- name: egress-gateway
+  repository: alias:helm-repo-1
+  version: 23.2.4
+- name: ingress-gateway
+  repository: alias:helm-repo-1
+  version: 23.2.4
+- condition: global.alternateRouteServiceEnable
+  name: alternate-route
+  repository: alias:helm-repo-1
+  version: 23.2.4
+- condition: appinfo.enabled
+  name: appinfo
+  repository: alias:helm-repo-1
+  version: 23.2.0
+- condition: global.performanceServiceEnable
+  name: perf-info
+  repository: alias:helm-repo-1
+  version: 23.2.0
+description: NRF helm chart
+name: ocnrf
+type: application
+version: 23.2.0

@@ -1,0 +1,124 @@
+# Copyright 2018 (C), Oracle and/or its affiliates. All rights reserved.
+
+global:
+  logStorage: 70
+  crictlStorage: 1
+  supportedVersions:
+    - autoscaling/v2
+    - autoscaling/v2beta2
+    - autoscaling/v2beta1
+    - autoscaling/v1
+    - policy/v1
+    - policy/v1beta1
+
+image:
+  name: ocnrf-nrfauditor
+  tag: 1.4.0
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port:
+    http: 8080
+
+
+minReplicas: 2
+maxReplicas: 2
+
+resources:
+  target:
+    averageCpuUtil: 80
+
+reg:
+  svc:
+    nfInstancesApi: "nnrf-nfm/v1/nf-instances"
+
+
+audit:
+  subInt: "30s"
+  hbRemoteInt: "10s"
+  hbInt: "5s"
+  nfInt: "60s"
+  waitTime: 35
+  subRemoteInt: "75m"
+  nrfEventInt: "10m"
+  
+log:
+  level: WARN
+  burst:
+    rate: 750
+    max: 3000
+  logLocationInfo: false
+  consoleFormat: jsonConsole
+
+
+dbRetry:
+  maxCount: 3
+  maxInterval: 200
+
+
+threadConfig:
+           maxThreadPoolSize: 55
+           coreThreadPoolSize: 50
+           queueCapacitySize: 60000
+
+
+jetty:
+   maxConcurrentPushedStreams: 1000
+   maxRequestsQueuedPerDestination: 1024
+   maxConnectionsPerDestination: 4 
+   maxConnectionsPerIp: 4
+   request:
+      timeout: 4000
+   connectionTimeout: 10000
+   idleTimeout: 10000
+   dnsRefreshDelay: 2000
+   pingDelay: 30
+   connectionFailureThreshold: 10
+
+# Multi Pod Support configuration
+multipodsupportenabled: true
+leaderelectiontablename: NrfAuditorLeaderPod
+multipodsupporthbtimestamplimttobeleader: 5000
+multipodsupporthbtimestamplimttoremoveleader: 8000
+multipodsupporthbupdateinterval: 1000
+
+   
+# Log files configuration
+#logFile:
+  # Path where log files will be generated
+  #basePath: ./logs/
+  # FileName in which latest logs will be present
+  #fileName: application.log
+  # The pattern of the file name of the archived log file
+  #filePattern: application-%d{MM-dd-yy-HH-mm-ss}-%i.log.gz
+  # Causes a rollover once the file has reached the specified size. With the suffix KB, MB or GB
+  #sizeBasedTriggeringPolicySize: 10MB
+  # Delete expression: deletionFilePattern && (deletionCriteriaLastModifiedTime || deletionCriteriaFileSize)
+  # Delete files whose name matches a regular expression
+  #deletionFilePattern: application-*.log.gz 
+  # Deletes files that are as old as or older than the specified duration
+  #deletionCriteriaLastModifiedTime: 20M
+  # Deletes after the accumulated file size threshold is exceeded during the file tree walk
+  #deletionCriteriaFileSize: 500 MB
+  
+  
+# Watch Dog configuration  
+watchDog:
+  isThreadWatchDogEnabled: true
+  watchDogMonitoringInterval: 10000
+  watchDogFailureRange: 2,4,6
+# Thread Max-Execution Time should be max among idleTimeout & connectionTimeout of jetty config in milli seconds
+  watchDogThreadMaxExecutionTime: 65000
+
+hooks:
+  preValidateEnabled: true
+  postValidateEnabled: true
+  faultRecoveryMode: false
+  faultRecoveryValidate: true
+  nrfDbSchema: "{\"versions\":[{\"version\":\"0\",\"dbList\":[{\"dbName\":\"leaderElectionDbName\",\"dbTableSchema\":[{\"tableName\":\"NrfAuditorLeaderPod\",\"columns\":[{\"column\":\"leaderIp\"},{\"column\":\"leaderSince\"},{\"column\":\"hbTimestamp\"}]}],\"tableConfiguration\":[{\"tableName\":\"NrfAuditorLeaderPod\"}]}]},{\"version\":\"2300100\",\"dbList\":[{\"dbName\":\"leaderElectionDbName\",\"dbTableSchema\":[{\"tableName\":\"NrfAuditorLeaderPod\",\"columns\":[{\"column\":\"leaderIp\"},{\"column\":\"leaderSince\"},{\"column\":\"hbTimestamp\"}]}],\"tableConfiguration\":[{\"tableName\":\"NrfAuditorLeaderPod\"}]}]}]}"
+
+#Auditor pod downtime threshold to pause audit processes.  
+auditorDowntimeThreshold: "5s"
+
+tolerations: []

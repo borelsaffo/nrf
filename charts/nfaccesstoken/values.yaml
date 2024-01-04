@@ -1,0 +1,120 @@
+# Copyright 2018 (C), Oracle and/or its affiliates. All rights reserved.
+
+global:
+  logStorage: 70
+  crictlStorage: 1
+  supportedVersions:
+    - autoscaling/v2
+    - autoscaling/v2beta2
+    - autoscaling/v2beta1
+    - autoscaling/v1
+    - policy/v1
+    - policy/v1beta1
+
+enabled: true
+
+image:
+  name: ocnrf-nfaccesstoken
+  tag: 1.4.0
+  pullPolicy: IfNotPresent
+  
+initContainersImage:
+  name: configurationinit
+  tag: 0.2.0
+  pullPolicy: IfNotPresent
+  
+updateContainersImage:
+  name: configurationupdate
+  tag: 0.2.0
+  pullPolicy: IfNotPresent
+  
+service:
+  type: ClusterIP
+  port:
+    http: 8080
+
+resources:
+  limits:
+    cpu: 4
+    initServiceCpu: 1
+    updateServiceCpu: 1
+    memory: 2Gi
+    updateServiceMemory: 1Gi
+    initServiceMemory: 1Gi
+  requests:
+    cpu: 4
+    initServiceCpu: 1
+    updateServiceCpu: 1
+    memory: 2Gi
+    updateServiceMemory: 1Gi
+    initServiceMemory: 1Gi
+  target:
+    averageCpuUtil: 80
+
+minReplicas: 1
+maxReplicas: 7
+
+server:
+  waitTime: 35
+
+
+log:
+  level: WARN
+  burst:
+    rate: 750
+    max: 3000
+  logLocationInfo: false
+  consoleFormat: jsonConsole
+
+initssl: false
+
+oauth:
+  nfQueryThreadPoolSize: 8
+
+systemOptionsFetchInterval: 3000
+
+
+dbRetry:
+  maxCount: 3
+  maxInterval: 200
+
+jetty:
+   maxConcurrentPushedStreams: 1000
+   maxRequestsQueuedPerDestination: 1024
+   maxConnectionsPerDestination: 4 
+   maxConnectionsPerIp: 4
+   request:
+      timeout: 4000
+   connectionTimeout: 10000
+   idleTimeout: 10000
+   dnsRefreshDelay: 2000
+   pingDelay: 30
+   connectionFailureThreshold: 10
+
+# Log files configuration
+#logFile:
+  # Path where log files will be generated
+  #basePath: ./logs/
+  # FileName in which latest logs will be present
+  #fileName: application.log
+  # The pattern of the file name of the archived log file
+  #filePattern: application-%d{MM-dd-yy-HH-mm-ss}-%i.log.gz
+  # Causes a rollover once the file has reached the specified size. With the suffix KB, MB or GB
+  #sizeBasedTriggeringPolicySize: 10MB
+  # Delete expression: deletionFilePattern && (deletionCriteriaLastModifiedTime || deletionCriteriaFileSize)
+  # Delete files whose name matches a regular expression
+  #deletionFilePattern: application-*.log.gz 
+  # Deletes files that are as old as or older than the specified duration
+  #deletionCriteriaLastModifiedTime: 20M
+  # Deletes after the accumulated file size threshold is exceeded during the file tree walk
+  #deletionCriteriaFileSize: 500 MB
+  
+# Watch Dog configuration  
+watchDog:
+  isThreadWatchDogEnabled: true
+  watchDogMonitoringInterval: 10000
+  watchDogFailureRange: 2,4,6
+# Thread Max-Execution Time should be max among idleTimeout & connectionTimeout of jetty config in milli seconds
+  watchDogThreadMaxExecutionTime: 65000
+
+tolerations: []

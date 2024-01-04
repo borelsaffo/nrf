@@ -1,0 +1,118 @@
+# Copyright 2022 (C), Oracle and/or its affiliates. All rights reserved.
+apiVersion: apps/v1 # for versions before 1.8.0 use apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ template "deployment.fullname" . }}  
+  labels:
+    {{- include "labels.nonlbDeployments" . }}
+    app.kubernetes.io/component: Nnrf_NFDiscovery
+  annotations:
+    {{- include "annotations.nonlbDeployments" . }}
+spec:
+  strategy:
+     type: {{ .Values.global.upgradeStrategy | quote }}
+     rollingUpdate:
+      maxUnavailable: {{ .Values.global.maxUnavailable | quote }}
+  {{ if eq .Values.global.removeReplicas "false" }}
+  replicas: {{ .Values.minReplicas }}
+  {{ end }}
+  selector:
+    matchLabels:
+       app.kubernetes.io/name: {{ template "chart.fullname" . }}
+       app.kubernetes.io/instance: {{ .Release.Name }}
+
+  template: # create pods using pod definition in this template
+    metadata:
+      labels:
+        {{- include "labels.nonlbDeployments" . | indent 4 }}
+        app.kubernetes.io/component: Nnrf_NFDiscovery
+      annotations:
+        {{- include "annotations.nonlbDeployments" . | indent 4 }}
+        prometheus.io/port:  {{ .Values.global.nfdiscovery.portConfiguration.commonServicePort | quote }}
+        prometheus.io/path: {{ .Values.global.prometheusScrapingConfig.path | quote }}
+        prometheus.io/scrape: {{ .Values.global.prometheusScrapingConfig.enabled | quote }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      restartPolicy: {{ .Values.podRestartPolicy  }}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+      {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      {{- else if(eq $helmBasedConfigurationNodeSelectorApiVersion "v1")}}
+      {{- $globalnodeselector := and  .Values.global.nodeSelector.nodeKey .Values.global.nodeSelector.nodeValue }}
+      {{- $localnodeselector := and  .Values.nodeSelector.nodeKey .Values.nodeSelector.nodeValue }}
+      {{- if or $globalnodeselector $localnodeselector }}
+      nodeSelector:
+      {{- if $localnodeselector }}
+         {{ .Values.nodeSelector.nodeKey }}: {{ .Values.nodeSelector.nodeValue }}
+      {{- else}}
+         {{ .Values.global.nodeSelector.nodeKey }}: {{ .Values.global.nodeSelector.nodeValue }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.server.waitTime }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: "app.kubernetes.io/name"
+                  operator: In
+                  values:
+                  - {{ template "chart.fullname" . }}
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      {{- include "extraContainers" . | nindent 6}}
+      - name: {{ template "container.fullname" . }}
+        command: ["java"]
+        args: ["-Xmx768m", "-XX:-ShowCodeDetailsInExceptionMessages", "-jar", "/opt/oracle/app/ocnrf-nfdiscovery.jar" ]
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        envFrom:
+        - configMapRef:
+            name: {{ template "configmap.fullname" . }}
+        resources:
+          requests:
+            cpu: {{ .Values.resources.requests.cpu | quote}}
+            memory: {{ .Values.resources.requests.memory | quote}}
+            {{- include "ocnrf-ephemeral-storage-request" . | nindent 12 }}
+          limits:
+            cpu: {{ .Values.resources.limits.cpu | quote}}
+            memory: {{ .Values.resources.limits.memory | quote}}
+            {{- include "ocnrf-ephemeral-storage-limit" . | nindent 12 }}
+        {{- if and (ge .Capabilities.KubeVersion.Major "1") (ge .Capabilities.KubeVersion.Minor "20") }}
+        startupProbe:
+          {{- .Values.startupProbe |  toYaml | nindent 12 }}
+        {{- end }}
+        readinessProbe:
+          {{- .Values.readinessProbe | toYaml | nindent 12 }}
+        livenessProbe:
+          {{- .Values.livenessProbe | toYaml | nindent 12 }}
+        ports:
+        - containerPort: {{ .Values.global.nfdiscovery.portConfiguration.containerPort }}
+          name: http2-sig
+        - containerPort: {{ .Values.global.nfdiscovery.portConfiguration.commonServicePort }}
+          name: cnc-metrics
+        env:
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      {{- if .Values.global.serviceAccountName }}
+      serviceAccountName: {{ .Values.global.serviceAccountName | quote}}
+      {{- else }}
+      serviceAccountName: {{ template "ocnrf.serviceaccount" . }}
+      {{- end }}
+
+      volumes:
+        {{- include "extraVolumes" . | nindent 8 }}

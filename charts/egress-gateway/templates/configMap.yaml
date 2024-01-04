@@ -1,0 +1,1018 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+   name: {{ template "configmap.fullname" .}}
+   labels:
+     {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: egress-front-end
+   annotations:
+     {{- include "annotations.allResources" . }}
+data:
+  APP_NAME: {{ template "service.fullname" . }}
+  ENGINEERING_VERSION: {{.Chart.Version}}
+  LOG_LEVEL: {{ .Values.log.level.updateContainer }}
+  MARKETING_VERSION: {{.Chart.Version}}
+  SSL_ENABLED: {{ include "initcontainer.enabled" . | quote }}
+  SSL_PORT: '{{ template "egressgateway.sslPort" . }}'
+  TLS_VERSION: {{ .Values.service.ssl.tlsVersion | quote }}
+  #CIPHER_SUITE: {{ .Values.service.ssl.supportedCipherSuiteList }}
+  SSL_PRIVATEKEY_SECRET_NAME: {{ .Values.service.ssl.privateKey.k8SecretName }}
+  SSL_PRIVATEKEY_SECRET_NAMESPACE: {{ .Values.service.ssl.privateKey.k8NameSpace }}
+  SSL_RSA_PRIVATE_KEY_FILENAME: {{ .Values.service.ssl.privateKey.rsa.fileName }}
+  SSL_ECDSA_PRIVATE_KEY_FILENAME: {{ .Values.service.ssl.privateKey.ecdsa.fileName }}
+  SSL_CERTIFICATE_SECRET_NAME: {{ .Values.service.ssl.certificate.k8SecretName }}
+  SSL_CERTIFICATE_SECRET_NAMESPACE: {{ .Values.service.ssl.certificate.k8NameSpace }}
+  SSL_RSA_CERTIFICATE_FILENAME: {{ .Values.service.ssl.certificate.rsa.fileName }}
+  SSL_ECDSA_CERTIFICATE_FILENAME: {{ .Values.service.ssl.certificate.ecdsa.fileName }}
+  SSL_INITIAL_ALGORITHM: {{ .Values.service.ssl.initialAlgorithm }}
+  SSL_CA_BUNDLE_SECRET_NAME: {{ .Values.service.ssl.caBundle.k8SecretName }}
+  SSL_CA_BUNDLE_SECRET_NAMESPACE: {{ .Values.service.ssl.caBundle.k8NameSpace }}
+  SSL_CA_BUNDLE_FILENAME: {{ .Values.service.ssl.caBundle.fileName }}
+  SSL_KEYSTORE_PASSWORD_SECRET_NAME: {{ .Values.service.ssl.keyStorePassword.k8SecretName }}
+  SSL_KEYSTORE_PASSWORD_SECRET_NAMESPACE: {{ .Values.service.ssl.keyStorePassword.k8NameSpace }}
+  SSL_KEYSTORE_PASSWORD_FILENAME: {{ .Values.service.ssl.keyStorePassword.fileName }}
+  SSL_TRUSTSTORE_PASSWORD_SECRET_NAME: {{ .Values.service.ssl.trustStorePassword.k8SecretName }}
+  SSL_TRUSTSTORE_PASSWORD_SECRET_NAMESPACE: {{ .Values.service.ssl.trustStorePassword.k8NameSpace }}
+  SSL_TRUSTSTORE_PASSWORD_FILENAME: {{ .Values.service.ssl.trustStorePassword.fileName }}
+  INIT_SSL: {{ include "initcontainer.enabled" . | quote }}
+  GATEWAY_PORT: '{{ template "egressgateway.port" . }}'
+  GATEWAY_CERT_RELOAD_ENABLED: {{ .Values.egressGwCertReloadEnabled | quote}}
+  GATEWAY_CERT_RELOAD_PATH: {{ .Values.egressGwCertReloadPath }}
+  GATEWAY_CERT_RELOAD_DELAY: {{ .Values.egressGwCertReloadDelay | quote}}
+  JETTY_MAX_CONCURRENT_PUSHEDSTREAMS: {{.Values.maxConcurrentPushedStreams | quote}}
+
+  application.yaml: |-
+    spring:
+      lifecycle:
+        timeout-per-shutdown-phase: {{ .Values.gracefulShutdown.gracePeriod | quote }}
+      cloud:
+        gateway:
+          {{- if .Values.sbiRouting.sbiRerouteEnabled }}
+          globalretry:
+            enabled: {{ .Values.globalretry.enabled }}
+            retries: {{ .Values.globalretry.retries }}
+          {{- end }}
+          default-filters:
+          {{- if .Values.deDupeResponseHeader }}
+            - DedupeResponseHeader={{ .Values.deDupeResponseHeader }}
+          {{- end }}
+          {{- if .Values.globalRemoveRequestHeader }}
+            {{- range .Values.globalRemoveRequestHeader }}
+            - RemoveRequestHeader={{ .name }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.globalRemoveResponseHeader }}
+            {{- range .Values.globalRemoveResponseHeader }}
+            - RemoveResponseHeader={{ .name }}
+            {{- end }}
+          {{- end }}
+          routes:
+          {{- if eq (.Values.routeConfigMode | default "HELM" ) "HELM" }}
+            - id: egress_route_proxy
+              order: 100
+              uri: egress://request.uri
+              predicates:
+                - Path=/**
+              filters:
+                - DefaultRouteRetry        
+          {{- if .Values.subLog.enabled }}
+            - id: sub_act_log
+              order: 99
+              uri: egress://request.uri
+              predicates:
+                - Path=/**
+                - ReadBodyForLog=true
+              filters:
+                - SubActLog
+          {{- end }}
+            {{- range .Values.routesConfig }}
+            - id: {{ .id }}
+              order: {{ .order }}
+              {{- if .filterName1 }}
+              uri: {{ tpl ( .uri ) $ }}
+              {{- else }}
+              uri: egress://request.uri
+              {{- end }}
+              predicates:
+              {{- if .path }}
+                - Path= {{ .path }}
+              {{- end }}
+              {{- if $.Values.subLog.enabled }}
+                - ReadBodyForLog=true
+              {{- end }}
+              {{- if .metadata }}
+              metadata:
+              {{- if .metadata.configurableErrorCodes }}
+                configurableErrorCodes:
+                  enabled: {{ .metadata.configurableErrorCodes.enabled }}
+              {{- if .metadata.configurableErrorCodes.errorScenarios }}
+                  errorScenarios:
+              {{- range .metadata.configurableErrorCodes.errorScenarios }}
+                  - exceptionType: {{ .exceptionType | quote }}
+                    errorProfileName: {{ .errorProfileName | quote }}
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- if .metadata.httpRuriOnly }}
+                httpRuriOnly: {{ .metadata.httpRuriOnly }}
+              {{- end }}
+              {{- if eq (toString .metadata.httpRuriOnly) "false" }}
+                httpRuriOnly: {{ .metadata.httpRuriOnly }}
+              {{- end }}
+              {{- if .metadata.ignoreMaxRspTimeHeader }}
+                ignoreMaxRspTimeHeader: {{ .metadata.ignoreMaxRspTimeHeader }}
+              {{- end }}
+              {{- if eq (toString .metadata.ignoreMaxRspTimeHeader) "false" }}
+                ignoreMaxRspTimeHeader: {{ .metadata.ignoreMaxRspTimeHeader }}
+              {{- end }}
+              {{- if .metadata.requestTimeout }}
+                requestTimeout: {{ .metadata.requestTimeout }}
+              {{- end }}
+              {{- if .metadata.oauthEnabled }}
+                oauthEnabled: {{ .metadata.oauthEnabled }}
+              {{- end }}
+              {{- if eq (toString .metadata.oauthEnabled) "false" }}
+                oauthEnabled: {{ .metadata.oauthEnabled }}
+              {{- end }}
+              {{- if .metadata.httpsTargetOnly }}
+                httpsTargetOnly: {{ .metadata.httpsTargetOnly }}
+              {{- end }}
+              {{- if eq (toString .metadata.httpsTargetOnly) "false" }}
+                httpsTargetOnly: {{ .metadata.httpsTargetOnly }}
+              {{- end }}
+              {{- if .metadata.sbiRoutingEnabled }}
+                sbiRoutingEnabled: {{ .metadata.sbiRoutingEnabled }}
+              {{- end }}
+              {{- if eq (toString .metadata.sbiRoutingEnabled) "false" }}
+                sbiRoutingEnabled: {{ .metadata.sbiRoutingEnabled }}
+              {{- end }}
+              {{- if .metadata.sbiRoutingWeightBasedEnabled }}
+                sbiRoutingWeightBasedEnabled: {{ .metadata.sbiRoutingWeightBasedEnabled }}
+              {{- end }}
+              {{- if eq (toString .metadata.sbiRoutingWeightBasedEnabled) "false" }}
+                sbiRoutingWeightBasedEnabled: {{ .metadata.sbiRoutingWeightBasedEnabled }}
+              {{- end }}
+            {{- end }}
+              filters:
+              {{- if .filterName1 }}
+                - name: {{ .filterName1.name }}
+                  args:
+              {{- if .filterName1.args.peerSetIdentifier }}
+                    peerSetIdentifier: {{ .filterName1.args.peerSetIdentifier }}
+              {{- end }}
+              {{- if .filterName1.args.customPeerSelectorEnabled }}
+                    customPeerSelectorEnabled: {{ .filterName1.args.customPeerSelectorEnabled }}
+              {{ else }}
+                    customPeerSelectorEnabled: false
+              {{- end }}
+              {{- if .filterName1.args.errorHandling }}
+                    errorHandling:
+                    {{- range .filterName1.args.errorHandling}}
+                     {{- if .errorCriteriaSet }}
+                     - errorCriteriaSet: {{ .errorCriteriaSet}}
+                     {{- end }}
+                     {{- if .actionSet }}
+                       actionSet: {{ .actionSet}}
+                     {{- end }}
+                     {{- if .priority }}
+                       priority: {{ .priority}}
+                     {{- end }}
+                    {{- end }}
+              {{- end }}
+              {{- end }}
+          {{- if $.Values.subLog.enabled }}
+                - SubActLog
+          {{- end}}
+          {{- if .removeRequestHeader }}
+            {{- range .removeRequestHeader }}
+                - RemoveRequestHeader={{ .name }}
+            {{- end }}
+          {{- end }}
+          {{- if .removeResponseHeader }}
+            {{- range .removeResponseHeader }}
+                - RemoveResponseHeader={{ .name }}
+            {{- end }}
+          {{- end }}
+              {{- if and $.Values.enableControlledShutdown .filterNameControlShutdown }}
+                - name: ControlledShutdownFilter
+                  args:
+                    applicableShutdownStates:
+                    {{- range .filterNameControlShutdown.args.applicableShutdownStates }}
+                    - {{ . }}
+                    {{- end }}
+                    unsupportedOperations:
+                    {{- range .filterNameControlShutdown.args.unsupportedOperations }}
+                    - {{ . }}
+                    {{- end }}
+              {{- end}}
+              {{- if .filterNameReqEntry }}
+                - name: CustomReqHeaderEntryFilter
+                  args:
+                    {{- if .filterNameReqEntry.args.headers }}
+                    headers:
+                      {{- range .filterNameReqEntry.args.headers }}
+                      - methods:
+                          {{- range .methods }}
+                          - {{ . }}
+                          {{- end }}
+                        headersList:
+                          {{- range .headersList }}
+                          - headerName: {{ .headerName }}
+                            defaultVal: {{ .defaultVal }}
+                            source: {{ .source }}
+                            sourceHeader: {{ .sourceHeader }}
+                            override: {{ .override }}
+                          {{- end }}
+                      {{- end }}
+                    {{- end }}
+              {{- end }}
+              {{- if .filterNameReqExit }}
+                - name: CustomReqHeaderExitFilter
+                  args:
+                    {{- if .filterNameReqExit.args.headers }}
+                    headers:
+                      {{- range .filterNameReqExit.args.headers }}
+                      - methods:
+                          {{- range .methods }}
+                          - {{ . }}
+                          {{- end }}
+                        headersList:
+                          {{- range .headersList }}
+                          - headerName: {{ .headerName }}
+                            defaultVal: {{ .defaultVal }}
+                            source: {{ .source }}
+                            sourceHeader: {{ .sourceHeader }}
+                            override: {{ .override }}
+                          {{- end }}
+                      {{- end }}
+                    {{- end }}
+              {{- end }}
+              {{- if.filterNameResEntry }}
+                - name: CustomResHeaderEntryFilter
+                  args:
+                    {{- if .filterNameResEntry.args.headers }}
+                    headers:
+                      {{- range .filterNameResEntry.args.headers }}
+                      - methods:
+                          {{- range .methods }}
+                          - {{ . }}
+                          {{- end }}
+                        headersList:
+                          {{- range .headersList }}
+                          - headerName: {{ .headerName }}
+                            defaultVal: {{ .defaultVal }}
+                            source: {{ .source }}
+                            sourceHeader: {{ .sourceHeader }}
+                            override: {{ .override }}
+                          {{- end }}
+                      {{- end }}
+                    {{- end }}
+              {{- end }}
+              {{- if.filterNameResExit }}
+                - name: CustomResHeaderExitFilter
+                  args:
+                    {{- if .filterNameResExit.args.headers }}
+                    headers:
+                      {{- range .filterNameResExit.args.headers }}
+                      - methods:
+                          {{- range .methods }}
+                          - {{ . }}
+                          {{- end }}
+                        headersList:
+                          {{- range .headersList }}
+                          - headerName: {{ .headerName }}
+                            defaultVal: {{ .defaultVal }}
+                            source: {{ .source }}
+                            sourceHeader: {{ .sourceHeader }}
+                            override: {{ .override }}
+                          {{- end }}
+                      {{- end }}
+                    {{- end }}
+              {{- end }}
+              {{- if .header }}
+                - Header= {{ .header }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+
+    ocpm:
+      gateway:
+        k8sServiceCheck: ${K8S_SERVICE_CHECK:{{ .Values.K8ServiceCheck }}}
+
+    notification.ratelimiting:
+      enabled: {{ .Values.notificationRateLimit.enabled }}
+      kubeServiceName: ${GATEWAY_SERVICE_NAME:}
+      kubeNamespace: ${K8S_NAMESPACE:}
+      duration: ${NOTIFICATION_RATELIMITING_DURATION:60}
+      capacity: ${NOTIFICATION_RATELIMITING_BUCKETCAPACITY:2}
+      refillRate: ${NOTIFICATION_RATELIMITING_REFILLRATE:1}
+      port: ${COHERENCE_PORT:8000}
+    
+    egress.ratelimiting:
+      enabled: {{ .Values.egressRateLimiting.enabled }}
+      duration: ${Egress_RATELIMITING_DURATION:60}
+      capacity: ${Egress_RATELIMITING_BUCKETCAPACITY:7}
+      refillRate: ${Egress_RATELIMITING_REFILLRATE:7}
+      minTokenRequest: {{ .Values.egressRateLimiting.minTokenRequest }}
+      maxTokenRequest: {{ .Values.egressRateLimiting.maxTokenRequest }}
+      rangePoint: {{ .Values.egressRateLimiting.rangePoint }}
+      errorCodeOnRateLimit: {{ .Values.egressRateLimiting.errorCodeOnRateLimit | quote }}
+    
+    scg:
+      alpn: ${ENV_ALPN:false}
+      gzip: ${ENV_GZIP:false}
+      host: ${EGRESS_SERVER_HOST:localhost}
+      port: ${EGRESS_SERVER_PORT:8080}
+
+    routeConfigMode: ${ROUTE_CONFIGMODE:HELM}
+    enableControlledShutdown: {{ .Values.enableControlledShutdown }}
+    controlledShutdownConfigMode: {{ .Values.controlledShutdownConfigMode | quote }}
+    {{- if .Values.controlledShutdownErrorMapping }}
+    controlledShutdownErrorMapping:
+      routeErrorProfileList:
+      {{- range .Values.controlledShutdownErrorMapping.routeErrorProfileList }}
+        - routeId: {{ .routeId }}
+          errorProfileName: {{ .errorProfileName | quote }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.errorCodeProfilesList }}
+    errorCodeProfilesList:
+      errorCodeProfiles:
+      {{- range .Values.errorCodeProfilesList.errorCodeProfiles }}
+        - name: {{ .name | quote }}
+          errorCode: {{ .errorCode }}
+          errorCause: {{ .errorCause | quote }}
+          errorTitle: {{ .errorTitle | quote }}
+          {{- if .redirectURL }}
+          redirectURL: {{ .redirectURL | quote }}
+          {{- end }}
+          {{- if .retryAfter }}
+          retryAfter: {{ .retryAfter | quote }}
+          {{- end }}
+          errorDescription: {{ .errorDescription | quote }}
+      {{- end }}
+    {{- end }}
+    # flag to indicate config is been read in k8s environment
+    configMapReadIndicator: true
+    
+    #flag to check alt route svc is up and running; else dont check
+    altRouteSvcReadyIndicator: {{ .Values.checkAltRouteSvcReady }}
+
+    #APIGW Thread Pool Configurations
+    applicationThreadPoolConfig:
+      corePoolSize: {{ .Values.applicationThreadPoolConfig.corePoolSize }}
+      maxPoolSize: {{ .Values.applicationThreadPoolConfig.maxPoolSize }}
+      queueCapacity: {{ .Values.applicationThreadPoolConfig.queueCapacity }}
+
+    sbi-routing:
+      sbiRoutingDefaultScheme: {{ .Values.sbiRouting.sbiRoutingDefaultScheme }}
+    {{- if eq (.Values.routeConfigMode | default "HELM" ) "HELM" }}
+      peerConfiguration:
+      {{- range .Values.sbiRouting.peerConfiguration }}
+      - id: {{ .id }}
+        {{- if .host }}
+        host: {{ .host }}
+        {{- end }}
+        {{- if .virtualHost }}
+        virtualHost: {{ .virtualHost }}
+        {{- end }}
+        {{- if .port }}
+        port: {{ .port }}
+        {{- end }}
+        {{- if .apiPrefix }}
+        apiPrefix: {{ .apiPrefix }}
+        {{- end }}
+        {{- if .healthApiPath }}
+        healthApiPath: {{ .healthApiPath }}
+        {{- end }}
+      {{- end }}
+      peerSetConfiguration:
+      {{- range .Values.sbiRouting.peerSetConfiguration }}
+      - id: {{ .id }}
+        {{- if .httpConfiguration }}
+        httpConfiguration:
+        {{- range .httpConfiguration }}
+        - priority: {{ .priority }}
+          peerIdentifier: {{ .peerIdentifier }}
+        {{- end }}
+        {{- end }}
+        {{- if .httpsConfiguration }}
+        httpsConfiguration:
+        {{- range .httpsConfiguration }}
+        - priority: {{ .priority }}
+          peerIdentifier: {{ .peerIdentifier }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.sbiRouting.peerMonitoringConfiguration }}
+      peerMonitoringConfiguration:
+        enabled: {{ .Values.sbiRouting.peerMonitoringConfiguration.enabled }}
+        timeout: {{ .Values.sbiRouting.peerMonitoringConfiguration.timeout }}
+        frequency: {{ .Values.sbiRouting.peerMonitoringConfiguration.frequency }}
+        failureThreshold: {{ .Values.sbiRouting.peerMonitoringConfiguration.failureThreshold }}
+        successThreshold: {{ .Values.sbiRouting.peerMonitoringConfiguration.successThreshold }}
+      {{- end }}
+     {{- if .Values.sbiRoutingErrorCriteriaSets }}
+      errorCriteriaSets:
+     {{- range .Values.sbiRoutingErrorCriteriaSets }}
+       - id: {{ .id}}
+         method:
+       {{- range .method }}
+          - {{ . }}
+       {{- end }}
+       {{- if .response }}
+         response:
+          statuses:
+          {{- range .response.statuses }}
+           - statusSeries: {{ .statusSeries }}
+             status:
+             {{- range .status }}
+              - {{ . }}
+             {{- end }}
+          {{- end }}
+          {{- if .response.headersMatchingScript }}
+          headersMatchingScript: {{ .response.headersMatchingScript | quote }}
+          {{- end }}
+        {{- end }}
+       {{- if .exceptions }}
+         exceptions:
+       {{- range .exceptions }}
+          - {{ . }}
+       {{- end }}
+     {{- end }}
+   {{- end }}
+ {{- end }}
+      {{- if .Values.sbiRoutingErrorActionSets }}
+      errorActionSets:
+      {{- range .Values.sbiRoutingErrorActionSets }}
+       - id: {{ .id }}
+         action: {{ .action }}
+         attempts: {{ .attempts }}
+       {{- if .blackList }}
+         blackList:
+          enabled: {{ .blackList.enabled }}
+          duration: {{ .blackList.duration }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+    dns-srv:
+      host: {{ template "service.alternateRouteSvcFullname" . }}
+      port: {{ .Values.dnsSrv.port }}
+      scheme: {{ .Values.dnsSrv.scheme }}
+
+    refresh-scheduler:
+      enabled: {{ .Values.refreshScheduler.enabled }}
+      interval: {{ mul .Values.refreshScheduler.interval 60000 }}  #in minutes
+      auditorShuffle: {{ .Values.refreshScheduler.auditorShuffle }}
+
+    retry-after:
+      enabled: {{ .Values.retryAfter.enabled }}
+      kubeServiceName: ${GATEWAY_SERVICE_NAME:}
+      kubeNamespace: ${K8S_NAMESPACE:}
+      hazelCastPort: ${COHERENCE_PORT:8000}
+      errorCodesToLook: {{ .Values.retryAfter.errorCodesToLook }}
+      blackListPeriod: {{ .Values.retryAfter.blackListPeriod }}
+      
+    defaultRouteRetryProfile: {{ .Values.defaultRouteRetryProfile | default "false" }} 
+    
+    {{- if  .Values.defaultRouteRetryProfile }}
+    defaultRetryProfile :
+      retryCount: {{ .Values.defaultRetryProfile.retryCount }}
+      requestTimeout: {{ .Values.defaultRetryProfile.requestTimeout }}
+      statuses:
+        {{- range .Values.defaultRetryProfile.statuses }}
+          - {{.}}
+        {{- end }}
+      exceptions:
+        {{- range .Values.defaultRetryProfile.exceptions }}
+          - {{.}}
+        {{- end }}    
+    {{- end }}
+     
+
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+
+
+    server:
+      port: ${EGRESS_SERVER_PORT:8080}
+      http2:
+        enabled: true
+      shutdown: graceful
+
+    prefix: {{ $.Values.prefix }}
+
+    {{- if  .Values.jaegerTelemetryTracingEnabled }}
+    openTelemetry :
+      jaeger:
+        enabled: {{ .Values.jaegerTelemetryTracingEnabled }}
+        udp-sender:
+          host: {{ .Values.openTelemetry.jaeger.udpSender.host | quote}}
+          port:  {{ .Values.openTelemetry.jaeger.udpSender.port }}
+        probabilistic-sampler:
+          sampling-rate: {{ .Values.openTelemetry.jaeger.probabilisticSampler }}
+    {{- end }}
+
+
+    {{- if  .Values.jaegerTracingEnabled }}
+    opentracing :
+      jaeger:
+        enable-b3-propagation: {{ .Values.openTracing.jaeger.enableb3Propagation }}
+        enabled: {{ .Values.jaegerTracingEnabled }}
+        udp-sender:
+          host: {{ .Values.openTracing.jaeger.udpSender.host | quote}}
+          port:  {{ .Values.openTracing.jaeger.udpSender.port }}
+        probabilistic-sampler:
+          sampling-rate: {{ .Values.openTracing.jaeger.probabilisticSampler }}
+    {{- end }}
+
+    {{- if or .Values.global.lciHeaderConfig.enabled .Values.global.ociHeaderConfig.enabled }}
+    perfInfoSchedulerEnabled: true
+    backend-svc-config:
+      svcToSvcInstanceIdMapping:
+    {{- range .Values.global.svcToSvcInstanceIdMapping }}
+      - svcName: {{ .svcName | quote }}
+        serviceInstanceId: {{ .serviceInstanceId | quote }}
+    {{- end }}
+    perf-info-config:
+      pollingInterval: {{ .Values.global.perfInfoConfig.pollingInterval | quote }}
+      perfInfoSvcHost: {{ template "service.perfInfoServiceFullName" .}}
+      perfInfoSvcPort: {{ .Values.global.perfInfoConfig.port | quote }}
+      perfInfoRequestMap: {{ .Values.global.perfInfoConfig.perfInfoRequestMap | quote }}
+    {{- else }}
+    perfInfoSchedulerEnabled: false
+    {{- end }}
+
+    lci-header-config:
+      enabled: {{ .Values.global.lciHeaderConfig.enabled }}
+    {{- if .Values.global.lciHeaderConfig.enabled }}
+      loadThreshold: {{ .Values.global.lciHeaderConfig.loadThreshold | quote }}
+      localLciHeaderValidity: {{ .Values.global.lciHeaderConfig.localLciHeaderValidity | quote }}
+      consumerSvcIdHeader: {{ .Values.global.lciHeaderConfig.consumerSvcIdHeader | quote }}
+      producerSvcIdHeader: {{ .Values.global.lciHeaderConfig.producerSvcIdHeader | quote }}
+    {{- end }}
+
+    oci-header-config:
+      enabled: {{ .Values.global.ociHeaderConfig.enabled }}
+    {{- if .Values.global.ociHeaderConfig.enabled }}
+      validityPeriod: {{ .Values.global.ociHeaderConfig.validityPeriod | quote }}
+      consumerSvcIdHeader: {{ .Values.global.ociHeaderConfig.consumerSvcIdHeader | quote }}
+      producerSvcIdHeader: {{ .Values.global.ociHeaderConfig.producerSvcIdHeader | quote }}
+      overloadConfigRange:
+        minor: {{ .Values.global.ociHeaderConfig.overloadConfigRange.minor | quote }}
+        major: {{ .Values.global.ociHeaderConfig.overloadConfigRange.major | quote }}
+        critical: {{ .Values.global.ociHeaderConfig.overloadConfigRange.critical | quote }}
+      reductionMetrics:
+        minor: {{ .Values.global.ociHeaderConfig.reductionMetrics.minor | quote }}
+        major: {{ .Values.global.ociHeaderConfig.reductionMetrics.major | quote }}
+        critical: {{ .Values.global.ociHeaderConfig.reductionMetrics.critical | quote }}
+    {{- end }}
+
+    sepp:
+      forwardProxy: {{ .Values.sepp.forwardProxy }}
+      egressProxyHeader: {{ .Values.sepp.egressProxyHeader }}
+      customAuthorityHeader: {{ .Values.sepp.customAuthorityHeader }}
+      removeUnusedProxyAfter: {{ .Values.sepp.removeUnusedProxyAfter }}
+
+    serverHeader:
+      autoBlackListProxy:
+        enabled: {{ .Values.serverHeader.autoBlackListProxy.enabled }}
+        errorCodeList:
+        {{- range .Values.serverHeader.autoBlackListProxy.errorCodeList }}
+          - errorSetId: {{ .errorSetId | quote }}
+            errorCodes: {{ .errorCodes | quote }}
+        {{- end }}
+        blacklistingPeriod: {{ .Values.serverHeader.autoBlackListProxy.blacklistingPeriod }}
+
+    egress-scg:
+      pingDelayDuration: {{ .Values.pingDelay }}
+      ssl:
+        port: {{ template "egressgateway.sslPort" . }}
+        enableoutgoinghttps: {{ .Values.enableOutgoingHttps }}
+        enableincominghttps: {{ .Values.enableIncomingHttps }}
+        {{- $tlsConnectionMode := (and .Values.sepp.forwardProxy .Values.sepp.tlsConnectionMode) }}
+        {{- if or (or .Values.enableOutgoingHttps .Values.enableIncomingHttps) $tlsConnectionMode }}
+        {{- $valid := .Values.allowedCipherSuites }}
+        ciphers:
+        {{- range .Values.cipherSuites }}
+           {{- if not (has . $valid)}}
+             {{- $cipher := printf "%s%s" . "-invalid or unsupported cipher" }}
+
+             {{- fail $cipher }}
+           {{- end }}
+           - {{.}}
+        {{- end }}
+        enabled: true
+        key-store:
+          path: /configinfo/KeyStore.jks
+          secretName: {{ .Values.service.ssl.keyStorePassword.k8SecretName }}
+          secretNameSpace: {{ .Values.service.ssl.keyStorePassword.k8NameSpace }}
+          passFile: {{ .Values.service.ssl.keyStorePassword.fileName }}
+        trust-store:
+          path: /configinfo/TrustStore.jks
+          secretName: {{ .Values.service.ssl.trustStorePassword.k8SecretName }}
+          secretNameSpace:  {{ .Values.service.ssl.trustStorePassword.k8NameSpace }}
+          passFile: {{ .Values.service.ssl.trustStorePassword.fileName }}
+        {{- else }}
+        enabled: false
+        {{- end }}
+    httpRuriOnly: {{ .Values.httpRuriOnly }}
+    httpsTargetOnly: {{ .Values.httpsTargetOnly }}
+    {{- if .Values.http1 }}
+    http1:
+      enableOutgoingHTTP1: {{ .Values.http1.enableOutgoingHTTP1 }}
+    {{- end }}
+
+    metricPrefix: ${METRIC_PREFIX:myprefix}
+    metricSuffix: ${METRIC_SUFFIX:mysuffix}
+    autoRedirect: ${AUTO_REDIRECT:true}
+    {{- if .Values.userAgentHeaderConfigMode }}
+    userAgentHeaderConfigMode: {{ .Values.userAgentHeaderConfigMode }}
+    {{- end }}
+    {{- if .Values.userAgentHeader }}
+    userAgentHeader:
+      enabled: {{ .Values.userAgentHeader.enabled }}
+      nfType: {{ .Values.userAgentHeader.nfType }}
+      nfInstanceId: {{ .Values.userAgentHeader.nfInstanceId }}
+      overwriteHeader: {{ .Values.userAgentHeader.overwriteHeader }}
+      {{- if .Values.userAgentHeader.addFqdnToHeader }}
+      addFqdnToHeader: {{ .Values.userAgentHeader.addFqdnToHeader }}
+      nfFqdn: {{ .Values.userAgentHeader.nfFqdn }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.isSbiTimerEnabled }}
+    isSbiTimerEnabled: {{ .Values.isSbiTimerEnabled | default "false" }}
+    sbiTimerTimezone: {{ .Values.sbiTimerTimezone | default "GMT" }}
+    {{- else }}
+    isSbiTimerEnabled: false
+    sbiTimerTimezone: "GMT"
+    {{- end }}
+    oauth:
+      client:
+        enabled: {{ .Values.oauthClient.enabled | quote }}
+        nrfClientQueryEnabled: {{ .Values.oauthClient.nrfClientQueryEnabled | quote }}
+      {{- if .Values.oauthClient.httpsEnabled }}
+        httpClientBean: jettysClient
+      {{- end }}
+        staticNrfList:
+        {{- range .Values.oauthClient.staticNrfList }}
+          - {{ tpl ( . ) $ }}
+        {{- end }}
+        nfType: {{ .Values.oauthClient.nfType }}
+        nfInstanceId: {{ .Values.oauthClient.nfInstanceId }}
+        consumerPlmn:
+          mnc: {{ .Values.oauthClient.consumerPlmnMNC | quote }}
+          mcc: {{ .Values.oauthClient.consumerPlmnMCC | quote }}
+        maxNonPrimaryNrfs: {{ .Values.oauthClient.maxNonPrimaryNrfs | quote }}
+        apiPrefix: {{ .Values.oauthClient.apiPrefix | quote }}
+        hazelCastPort: ${COHERENCE_PORT:8000}
+        kubeServiceName: ${GATEWAY_SERVICE_NAME:}
+        KubeNamespace: ${GATEWAY_NAMESPACE:}
+        connectionTimeout: {{ .Values.oauthClient.connectionTimeout | quote }}
+        requestTimeout: {{ .Values.oauthClient.requestTimeout | quote }}
+        oauthDeltaExpiryTime: {{ .Values.oauthClient.oauthDeltaExpiryTime | quote }}
+        attemptsForPrimaryNRFInstance: {{ .Values.oauthClient.attemptsForPrimaryNRFInstance | quote }}
+        attemptsForNonPrimaryNRFInstance: {{ .Values.oauthClient.attemptsForNonPrimaryNRFInstance | quote }}
+        defaultNRFInstance: {{ .Values.oauthClient.defaultNRFInstance | quote }}
+        idleTimeout: ${IDLE_TIMEOUT:}
+        nrfClientHost: {{ template "service.nrfClientServiceFullName" . }}
+        nrfClientPort: {{ .Values.oauthClient.nrfClientConfig.port | quote }}
+        nrfClientRequestMap: {{ .Values.oauthClient.nrfClientConfig.nrfClientRequestMap | quote }}
+        egwServiceName: {{ template "service.fullname" .}}
+        egwServicePort: ${EGRESS_SERVER_PORT:8080}
+        scheduledDelay: {{ .Values.oauthClient.subscriptionRetryScheduledDelay | quote }}
+        retryErrorCodeSeriesForSameNrf:
+        {{- range .Values.oauthClient.retryErrorCodeSeriesForSameNrf }}
+          - errorSetId: {{ .errorSetId | quote }}
+            errorCodes: {{ .errorCodes | quote }}
+        {{- end }}
+        retryExceptionListForSameNrf:
+        {{- range .Values.oauthClient.retryExceptionListForSameNrf }}
+          - {{.}}
+        {{- end }}
+        retryErrorCodeSeriesForNextNrf:
+        {{- range .Values.oauthClient.retryErrorCodeSeriesForNextNrf }}
+          - errorSetId: {{ .errorSetId | quote }}
+            errorCodes: {{ .errorCodes | quote }}
+        {{- end }}
+        retryExceptionListForNextNrf:
+        {{- range .Values.oauthClient.retryExceptionListForNextNrf }}
+          - {{.}}
+        {{- end }}
+
+    header-indexing:
+      doNotIndex: {{ .Values.headerIndexing.doNotIndex }}
+      
+    sniHeaderEnabled: {{ .Values.sniHeader.enabled }}
+
+    {{- $notificationRateLimitFlag := false }}
+    {{- if .Values.notificationRateLimit.errorCodeOnRateLimit }}
+    {{- $notificationRateLimitFlag = true }}
+    {{- end }}
+
+    {{- $retryAfterFlag := false }}
+    {{- if .Values.retryAfter.returnErrorCode }}
+    {{- $retryAfterFlag = true }}
+    {{- end }}
+
+    {{- $gracefulShutdownFlag := false }}
+    {{- if .Values.gracefulShutdown.defaultErrorCode }}
+    {{- $gracefulShutdownFlag = true }}
+    {{- end }}
+
+    {{- $dnsSrvFlag := false }}
+    {{- if .Values.dnsSrv.errorCodeOnDNSResolutionFailure }}
+    {{- $dnsSrvFlag = true }}
+    {{- end }}
+
+    {{- $oauthClientFlag := false }}
+    {{- if .Values.oauthClient.defaultErrorCode }}
+    {{- $oauthClientFlag = true }}
+    {{- end }}
+
+    {{- $configErrorCodesFlag := false }}
+    {{- if .Values.configurableErrorCodes }}
+    {{- range .Values.configurableErrorCodes.errorScenarios }}
+    {{- if.errorCode }}
+    {{- $configErrorCodesFlag = true }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    
+    {{- if or $notificationRateLimitFlag $retryAfterFlag $gracefulShutdownFlag $dnsSrvFlag $oauthClientFlag $configErrorCodesFlag }}
+    backwardCompatibility: true
+    {{- else }}
+    backwardCompatibility: false
+    {{- end }}
+
+
+    configurable-error-codes:
+    {{- $enabled := false }}
+    {{- if or .Values.configurableErrorCodes.enabled $notificationRateLimitFlag $retryAfterFlag $gracefulShutdownFlag $dnsSrvFlag $oauthClientFlag }}
+      enabled: true
+    {{- $enabled = true }}
+    {{- else }}
+    {{- $enabled = false }}
+      enabled: false
+    {{- end }}
+
+    {{- if $enabled }}
+      errorScenarios:
+    {{- if .Values.configurableErrorCodes.enabled }}
+    {{- range .Values.configurableErrorCodes.errorScenarios }}
+    {{- if .errorProfileName }}
+      - exceptionType: {{ .exceptionType | quote }}
+        errorProfileName: {{ .errorProfileName | quote }}
+
+    {{- else if eq (.exceptionType ) "ConnectionTimeout" }}
+      - exceptionType: {{ "CONNECTION_TIMEOUT" }}
+        errorProfileName: {{ "ERR_100" }}
+
+    {{- else if eq (.exceptionType ) "RequestTimeout" }}
+      - exceptionType: {{ "REQUEST_TIMEOUT" }}
+        errorProfileName: {{ "ERR_101" }}
+
+    {{- else if eq (.exceptionType ) "UnknownHostException" }}
+      - exceptionType: {{ "UNKNOWN_HOST_EXCEPTION" }}
+        errorProfileName: {{ "ERR_102" }}
+
+    {{- else if eq (.exceptionType ) "ConnectException" }}
+      - exceptionType: {{ "CONNECT_EXCEPTION" }}
+        errorProfileName: {{ "ERR_103" }}
+
+    {{- else if eq (.exceptionType ) "RejectedExecutionException" }}
+      - exceptionType: {{ "REJECTED_EXECUTION_EXCEPTION" }}
+        errorProfileName: {{ "ERR_104" }}
+
+    {{- else if eq (.exceptionType ) "ClosedChannelException" }}
+      - exceptionType: {{ "CLOSED_CHANNEL_EXCEPTION" }}
+        errorProfileName: {{ "ERR_105" }}
+
+    {{- else if eq (.exceptionType ) "SSLHandshakeException" }}
+      - exceptionType: {{ "SSL_HANDSHAKE_EXCEPTION" }}
+        errorProfileName: {{ "ERR_106" }}
+
+    {{- else if eq (.exceptionType ) "InternalError" }}
+      - exceptionType: {{ "INTERNAL_ERROR" }}
+        errorProfileName: {{ "ERR_107" }}
+
+    {{- else if eq (.exceptionType ) "NotFoundException" }}
+      - exceptionType: {{ "NOT_FOUND_EXCEPTION" }}
+        errorProfileName: {{ "ERR_108" }}
+
+    {{- else if eq (.exceptionType ) "LateArrivalException" }}
+      - exceptionType: {{ "LATE_ARRIVAL_EXCEPTION" }}
+        errorProfileName: {{ "ERR_109" }}
+
+    {{- else if eq (.exceptionType ) "InvalidHTTPRequestException" }}
+      - exceptionType: {{ "INVALID_HTTP_REQUEST_EXCEPTION" }}
+        errorProfileName: {{ "ERR_110" }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    {{- if $notificationRateLimitFlag }}
+      - exceptionType: {{ "NOTIFICATION_RATE_LIMIT" }}
+        errorProfileName: {{ "ERR_111" }}
+    {{- end }}
+
+    {{- if $retryAfterFlag }}
+      - exceptionType: {{ "RETRY_AFTER_ERROR" }}
+        errorProfileName: {{ "ERR_112" }}
+    {{- end }}
+
+    {{- if $gracefulShutdownFlag }}
+      - exceptionType: {{ "GRACEFUL_SHUTDOWN" }}
+        errorProfileName: {{ "ERR_113" }}
+    {{- end }}
+
+    {{- if $dnsSrvFlag }}
+      - exceptionType: {{ "VIRTUAL_HOST_RESOLUTION_ERROR" }}
+        errorProfileName: {{ "ERR_114" }}
+    {{- end }}
+
+    {{- if $oauthClientFlag }}
+      - exceptionType: {{ "OAUTH_TOKEN_RETRIEVAL_FAILURE" }}
+        errorProfileName: {{ "ERR_115" }}
+      - exceptionType: {{ "INVALID_OAUTH_TOKEN_REQUEST" }}
+        errorProfileName: {{ "ERR_115" }}
+      - exceptionType: {{ "OAUTH_INTERNAL_ERROR" }}
+        errorProfileName: {{ "ERR_115" }}
+      - exceptionType: {{ "OAUTH_NRF_RESPONSE_FAILURE" }}
+        errorProfileName: {{ "ERR_115" }}
+
+    {{- end }}
+
+    {{- end }}
+
+    error-code-profiles:
+      errorProfiles:
+      {{- if .Values.errorCodeProfiles }}
+      {{- range .Values.errorCodeProfiles }}
+        - name: {{ .name | quote }}
+          errorCode: {{ .errorCode }}
+          {{- if .errorCause }}
+          errorCause: {{ .errorCause | quote }}
+          {{- end }}
+          {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle | quote }}
+          {{- end }}
+          {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription | quote }}
+          {{- end }}
+      {{- end }}
+      {{- end }}
+
+    {{- if .Values.configurableErrorCodes.enabled }}
+    {{- range .Values.configurableErrorCodes.errorScenarios }}
+      {{- if eq (.exceptionType ) "ConnectionTimeout" }}
+        - name: {{ "ERR_100" }}
+      {{- else if eq (.exceptionType ) "RequestTimeout" }}
+        - name: {{ "ERR_101" }}
+      {{- else if eq (.exceptionType ) "UnknownHostException" }}
+        - name: {{ "ERR_102" }}
+      {{- else if eq (.exceptionType ) "ConnectException" }}
+        - name: {{ "ERR_103" }}
+      {{- else if eq (.exceptionType ) "RejectedExecutionException" }}
+        - name: {{ "ERR_104" }}
+      {{- else if eq (.exceptionType ) "ClosedChannelException" }}
+        - name: {{ "ERR_105" }}
+      {{- else if eq (.exceptionType ) "SSLHandshakeException" }}
+        - name: {{ "ERR_106" }}
+      {{- else if eq (.exceptionType ) "InternalError" }}
+        - name: {{ "ERR_107" }}
+      {{- else if eq (.exceptionType ) "NotFoundException" }}
+        - name: {{ "ERR_108" }}
+      {{- else if eq (.exceptionType ) "LateArrivalException" }}
+        - name: {{ "ERR_109" }}
+      {{- else if eq (.exceptionType ) "InvalidHTTPRequestException" }}
+        - name: {{ "ERR_110" }}
+      {{- end }}
+      {{- if .errorCode }}
+          errorCode: {{ .errorCode }}
+      {{- end }}
+      {{- if .errorCause }}
+          errorCause: {{ .errorCause }}
+      {{- end }}
+      {{- if .errorTitle }}
+          errorTitle: {{ .errorTitle }}
+      {{- end }}
+      {{- if .errorDescription }}
+          errorDescription: {{ .errorDescription }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+
+      {{- if $notificationRateLimitFlag }}
+        - name: {{ "ERR_111" }}
+          errorCode: {{ .Values.notificationRateLimit.errorCodeOnRateLimit }}
+        {{- if .Values.notificationRateLimit.errorCauseOnRateLimit }}
+          errorCause: {{ .Values.notificationRateLimit.errorCauseOnRateLimit | quote }}
+        {{- end }}
+        {{- if .Values.notificationRateLimit.errorTitleOnRateLimit }}
+          errorTitle: {{ .Values.notificationRateLimit.errorTitleOnRateLimit | quote }}
+        {{- end }}
+        {{- if .Values.notificationRateLimit.errorDescriptionOnRateLimit }}
+          errorDescription: {{ .Values.notificationRateLimit.errorDescriptionOnRateLimit | quote }}
+        {{- end }}
+      {{- end }}
+
+      {{- if $retryAfterFlag }}
+        - name: {{ "ERR_112" }}
+          errorCode: {{ .Values.retryAfter.returnErrorCode }}
+      {{- end }}
+
+      {{- if $gracefulShutdownFlag }}
+        - name: {{ "ERR_113" }}
+          errorCode: {{ .Values.gracefulShutdown.defaultErrorCode }}
+        {{- if .Values.gracefulShutdown.errorCause }}
+          errorCause: {{ .Values.gracefulShutdown.errorCause | quote }}
+        {{- end }}
+        {{- if .Values.gracefulShutdown.errorTitle }}
+          errorTitle: {{ .Values.gracefulShutdown.errorTitle | quote }}
+        {{- end }}
+        {{- if .Values.gracefulShutdown.errorDescription }}
+          errorDescription: {{ .Values.gracefulShutdown.errorDescription | quote }}
+        {{- end }}
+      {{- end }}
+
+      {{- if $dnsSrvFlag }}
+        - name: {{ "ERR_114" }}
+          errorCode: {{ .Values.dnsSrv.errorCodeOnDNSResolutionFailure }}
+        {{- if .Values.dnsSrv.errorCauseOnDNSResolutionFailure }}
+          errorCause: {{ .Values.dnsSrv.errorCauseOnDNSResolutionFailure | quote }}
+        {{- end }}
+        {{- if .Values.dnsSrv.errorTitleOnDNSResolutionFailure }}
+          errorTitle: {{ .Values.dnsSrv.errorTitleOnDNSResolutionFailure | quote }}
+        {{- end }}
+        {{- if .Values.dnsSrv.errorDescriptionOnDNSResolutionFailure }}
+          errorDescription: {{ .Values.dnsSrv.errorDescriptionOnDNSResolutionFailure | quote }}
+        {{- end }}
+      {{- end }}
+
+      {{- if $oauthClientFlag }}
+        - name: {{ "ERR_115" }}
+          errorCode: {{ .Values.oauthClient.defaultErrorCode }}
+      {{- end }}
+
+   {{- if .Values.global.nfInstanceId }}
+    nfInstanceId: {{ .Values.global.nfInstanceId | quote }}
+   {{- end }}
+   {{- if .Values.global.nfType }}
+    nfType: {{ .Values.global.nfType | quote }}
+   {{- end }}
+   {{- if .Values.global.nfFqdn }}   
+    nfFqdn: {{ .Values.global.nfFqdn | quote }}
+   {{- end }}
+
+    {{- if .Values.messageCopy }}
+    {{- $trustStoreSecret := .Values.service.ssl.trustStorePassword.k8SecretName -}}
+    {{- $trustStoreNs := .Values.service.ssl.trustStorePassword.k8NameSpace -}}
+    {{- $trustStorefileName := .Values.service.ssl.trustStorePassword.fileName -}}
+    {{- with .Values.messageCopy }}
+    message-copy:
+     enabled: {{ .enabled | default false }}
+     copyPayload: {{ .copyPayload | default false }}
+     topicName: {{ .topicName | quote }}
+     ackRequired: {{ .ackRequired | default false }}
+     retryOnFailure: {{ .retryOnFailure | default 0 }}
+    {{- with .security }}
+     security:
+       enabled: {{ .enabled | default false }}
+       protocol: {{ .protocol | default "SASL_SSL" }}
+       tlsVersion: {{ .tlsVersion | default "TLSv1.2" }}
+       trustStore:
+         path: /configinfo/TrustStore.jks
+         password:
+           k8SecretName: {{ $trustStoreSecret }}
+           k8NameSpace: {{ $trustStoreNs }}
+           fileName: {{ $trustStorefileName }}
+       sasl:
+         userName: {{ .saslConfiguration.userName }}
+         password:
+           k8SecretName: {{ .saslConfiguration.password.k8SecretName }}
+           k8NameSpace: {{ .saslConfiguration.password.k8NameSpace }}
+           fileName: {{ .saslConfiguration.password.fileName }}
+    {{- end }}
+     threadPoolConfigurations:
+      coreSize: {{ .threadPoolConfigurations.coreSize | default 8 }}
+      maxSize: {{ .threadPoolConfigurations.maxSize | default 8 }}
+      queueCapacity: {{ .threadPoolConfigurations.queueCapacity | default 1000 }}
+     faultTolerance:
+      base: {{ .faultTolerance.base | default 120000 }}
+      limit: {{ .faultTolerance.limit | default 960000 }}
+      resetAfter: {{ .faultTolerance.resetAfter | default 1500000 }}
+    {{- end }}
+    {{- end }}
+    
+    {{- if .Values.messageCopy }}
+    {{- if and .Values.messageCopy.enabled .Values.kafka }}
+    kafka:
+     bootstrapAddress: {{ .Values.kafka.bootstrapAddress | quote }}
+    {{- end }}
+    {{- end }}
+

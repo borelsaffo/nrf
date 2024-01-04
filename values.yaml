@@ -1,0 +1,4062 @@
+# Copyright 2020 (C), Oracle and/or its affiliates. All rights reserved.  
+
+#########################################################
+#            Section Start: global attributes           #   
+#########################################################
+global:
+  nrfTag: &nrfTagRef 23.2.0
+  gwTag: &gwTagRef 23.2.4
+  helmTestTag: &helmTestTagRef 23.2.0
+  appInfoTag: &appInfoTagRef 23.2.0
+  perfInfoTag: &perfInfoTagRef 23.2.0
+  # use in _helpers.tpl
+  debugToolTag: 23.2.0
+
+  # MYSQL configurable params
+  mysql:
+    primary:
+      # Primary DB Connection Service IP or Hostname
+      host: &mySqlHostRef "changedb"
+      port: &mySqlPortRef 3306
+    secondary:
+      # Secondary DB Connection Service IP or Hostname
+      host: ""
+      port: ""
+
+
+  # The below flags are related to installation hardening feature
+  appValidate:
+    #The flag preValidateEnabled indicates whether Pre-Install validations are to be performed
+    preValidateEnabled: &preValidateEnabledRef true
+    #The flag postValidateEnabled indicates whether Post-Install validations are to be performed
+    postValidateEnabled: &postValidateEnabledRef true
+    #The flag faultRecoveryMode indicates if the OCNRF is deployed in Fault Recovery Mode. If the value is set to true, OCNRF is deployed in Fault Recovery Mode. If the value is set to false, OCNRF is not deployed in Fault Recovery Mode.
+    faultRecoveryMode: &faultRecoveryModeRef false
+    #@Engineering-start
+    #This flag is used to determine whether Fault Recovery validation to be done or not
+    faultRecoveryValidate: &faultRecoveryValidateRef true
+    #@Engineering-end
+
+  # This flag shall be set to true if Discovered SLF Candidate feature or DNS NAPTR feature is enabled.
+  enableNrfArtisanService: false
+
+  # Engineering configuration to select database (read only)
+  databaseEngine: &databaseEngineRef "ndbcluster"
+
+  # Node Selector Status (ENABLED/DISABLED)
+  ## Note: The below configurations are not applicable for appinfo and perfinfo and their respective values are used. 
+  nodeSelection: "DISABLED"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'
+
+  # Tolerations Setting Status (ENABLED/DISABLED)
+  tolerationsSetting: "DISABLED"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  # The flag is used to enable the controlled shutdown feature
+  enableControlledShutdown: &controlledShutdownRef true
+
+  #@Engineering-start
+  ingressCommonSvcName: &ingressCommonSvcNameRef igw
+  egressCommonSvcName: &egressCommonSvcNameRef egw
+  appinfoCommonSvcName: &appinfoCommonSvcNameRef appinfo
+  altRouteCommonSvcName: &altRouteCommonSvcNameRef altRoute
+  perfInfoCommonSvcName: &perfInfoCommonSvcNameRef perfinfo
+  #@Engineering-end
+  
+
+  # Engineering configuration
+  # Maximum allowed unavailable pods during pod disruption
+  # This global configured value is used for all NRF
+  # micro-services.
+  #
+  # There is an option provided to override this global value
+  # in per micro-service section. 
+  #
+  # Note: As of now appinfo and perf-info micro-service are using different 
+  # value then this global configured value. See corresponding sections 
+  # for more details.
+  maxPdbUnavailable: &maxPdbUnavailableRef "25%"
+  
+  # Engineering configuration
+  # Maximum allowed unavailable pods during upgrade
+  # This global configured value is used for all NRF
+  # micro-services.
+  #
+  # There is an option provided to override this global value
+  # in per micro-service section. 
+  #
+  # Note: As of now appinfo and perf-info micro-service are using different 
+  # value then this global configured value. See corresponding sections 
+  # for more details.
+  maxUnavailable: &maxUnavailableRef "25%"
+
+  #@Engineering-start
+  # Added this flag to remove "replicas: " from NRF backebd micro-services
+  removeReplicas: "true"
+
+  # Engineering configuration: To enable system level logs
+  systemLoggingLevel: "WARN"
+  #@Engineering-end
+
+  #dbMonitorSvcHost, dbMonitorSvcPort, replicationStatusResourceUri has been deprecated. Please refer appinfo section to configure these attributes.
+  #@Engineering-start 
+  #Host name of db monitor service
+  dbMonitorSvcHost: "mysql-cluster-db-monitor-svc"
+  #Port of db monitor service
+  dbMonitorSvcPort: 8080
+  #@Engineering-end
+
+  # OCNRF's NF Instance ID is a mandatory parameter
+  #
+  # This is the NfInstanceId of OCNRF that will get deployed.
+  # Format of NfInstanceId:
+  # Universally Unique Identifier (UUID) version 4, as described in IETF RFC 4122
+  #
+  # e.g.: 6faf1bbc-6e4a-4454-a507-a14ef8e1bc5c
+  #
+  # This ID is used to uniquely identify this OCNRF instance in a Geo-Redundant Deployment.
+  # Hence it is very important that the Instance ID MUST be unique across all OCNRF deployments.
+  #
+  nrfInstanceId: &nrfInstanceIdRef "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5c"
+
+  # This is the nfInstanceId of OCNRF will use as producer-id in message copy
+  nfInstanceId: *nrfInstanceIdRef
+
+  # This is the nfType of OCNRF will use as nf-Type in message copy
+  nfType: NRF
+
+  # This is the fqdn of OCNRF will use as nf-fqdn in message copy
+  nfFqdn: NRF-d5g.oracle.com
+
+  #
+  # siteNameToNrfInstanceIdMapping is a list attribute signifies the mapping between the remote sites'
+  # nrfInstanceId and corresponding database siteName
+  #
+  # This configuration consumed ONLY when Geo-Redundancy feature is ENABLED.
+  # CAUTION:- Any wrong configuration can lead to Geo-Redundancy feature failure.
+  #
+  # This attribute can be updated later using Rest APIs for geoRedundancyOptions with
+  # attribute siteNameToNrfInstanceIdMapping
+  #
+  siteNameToNrfInstanceIdMapping:
+  #- siteName: 5faf1bbc-6e4a-4454-a507-a14ef8e1bc5c
+  #  nrfInstanceId: 723da493-528f-4bed-871a-2376295c0020
+
+  # Docker Registry's Host or IP from where container images will be pulled.
+  dockerRegistry: changedockerRegistry
+
+  #@Engineering-start
+  # Engineering configuration: Required for CNC Data Collector
+  vendor: "Oracle"
+  app_name: "ocnrf"
+
+  # Engineering configuration: Maximum time to wait for response
+  readTimeout: 10
+  #@Engineering-end
+  # Namespace and secret name for database connections
+  # This secret will contain mysql db name, user to access db name and password for the user
+  database:
+    # Namespace where the Secret is created
+    nameSpace: "changens"
+    # K8s Secret containing Database/user/password for services
+    appUserSecretName: "appuser-secret"
+    # K8s Secret containing Database/user/password for DB Hooks for creating tables
+    privilegedUserSecretName: &privilegedSecretNameRef "privilegeduser-secret"
+    commonConfigDbName: &dbNameRef 'commonConfigurationDB'
+    leaderElectionDbName: &leaderElectionDbNameRef 'leaderElectionDB'
+    #@Engineering-start
+    dbUNameLiteral: &dbUserRef dbUsername
+    dbPwdLiteral: &dbPwdRef dbPassword
+    #@Engineering-end
+
+  #Mandatory: This parameter must be set to "true" when NRF is deployed with the Service Mesh
+
+  serviceMeshCheck: &serviceMeshCheckRef false
+  # Mandatrory: needs to be set with correct url format http://127.0.0.1:<istio management port>/quitquitquit" if NRF is deployed with the Service Mesh.
+  istioSidecarQuitUrl: &istioSidecarQuitUrlRef "http://127.0.0.1:15000/quitquitquit"
+  # Mandatrory: needs to be set with correct url format http://127.0.0.1:<istio management port>/ready" if NRF is deployed with the Service Mesh.
+  istioSidecarReadyUrl: &istioSidecarReadyUrlRef "http://127.0.0.1:15000/ready"
+
+  # Resources allocated for execution of jobs associated with hooks
+  hookJobResources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- memory: 1Gi
+      memory: 2Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 1
+      #@min_resources- memory: 1Gi
+      memory: 1Gi
+
+  #@Engineering-start
+  # Engineering configuration: This value should not be changed
+  hookWeight:
+    nrfConfiguration: "0"
+    nfRegistration: "1"
+    nfSubscription: "2"
+    nrfAuditor: "3"
+    nfDiscovery: "3"
+    nfAccessToken: "3"
+    nrfArtisan: "3"
+  #@Engineering-end
+  
+  #@Engineering-start
+  #List of API versions supported by kubernetes
+  supportedVersions:
+    - autoscaling/v2
+    - autoscaling/v2beta2
+    - autoscaling/v2beta1
+    - autoscaling/v1
+    - policy/v1
+    - policy/v1beta1
+  #@Engineering-end
+
+  #This attribute shall be set to true for the below conditions
+  #1. DNS SRV resolution of SCP is required for SLF queries
+  #2. DNS-NAPTR feature is enabled.
+  alternateRouteServiceEnable: false
+  
+  #Flag to Enable or Disable Performance Service. The flag is set to true to enable the overload control feature by default. 
+  performanceServiceEnable: false
+
+  #Image Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+  imagePullPolicy: &imagePullPolicyRef IfNotPresent
+
+  # ********  Sub-Section Start: Day Zero Configuration  ********
+  #*******************************************************************
+  # post install configuration parameters:
+  dayZeroConfiguration:
+    hplmnList:
+    #- mcc: "310"
+    #  mnc: "14"
+    ocnrfHost: changehost
+    ocnrfPort: changeport
+    ocnrfScheme: http
+    #@Engineering-start
+    #Engineering configuration: This value should not be changed
+    # No. of retries & ResourceUri of  configuration microservice for post install configuration
+    maxRetries: 15
+    #Wait time for the configuration post-install hook
+    waitTime: 30000
+    generalOptionsResourceUri: /nrf-configuration/v1/generalOptions
+    accessTokenOptionsResourceUri: /nrf-configuration/v1/nfAccessTokenOptions
+    #@Engineering-end
+  # ********  Sub-Section End: Day Zero Configuration  ********
+  #*******************************************************************
+
+  #@Engineering-start
+  # ********  Sub-Section Start: APP-INFO Global Parameters ********
+  #*******************************************************************
+
+  appinfoServiceEnable: true
+  appinfoCheckEnabled: true
+  nfName: ocnrf
+
+  # ********  Sub-Section End: APP-INFO Global Parameters ********
+  #*******************************************************************
+  #@Engineering-end
+
+
+  # CNCConsole integration flag
+  #
+  # if cncConsoleDeployed is false, then nrfConfiguration micro-service must
+  # be deployed with service type as LoadBalancer (type: LoadBalancer)
+  # Otherwise nrfConfiguration micro-service should be deployed with service
+  # type as ClusterIP (type: ClusterIP)
+  cncConsoleDeployed: false
+
+  # serviceAccountName is a mandatory parameter
+  #
+  # Kubernetes Secret resource is used for below use cases in OCNRF
+  # - For providing MYSQL DB Details to micro-services
+  # - For providing NRF's Private Key, NRF's Certificate and CA Certificate Details to Ingress/Egress Gateway for TLS
+  # - For providing NRF's Private and NRF's Public Keys to nfAccessToken micro-service for Digitally Signing AccessTokenClaims.
+  # - For providing Producer/Consumer NF's Service/Endpoint details for routing messages from/to Egress/Ingress Gateway.
+  #
+  # The Secret(s) can be under same namespace where OCNRF is getting deployed (recommended) or
+  # Operator can choose to use different namespaces for different secret(s).
+  #
+  # If all the Secret(s) are under same namespace as OCNRF, then Kubernetes Role can be binded with the given ServiceAccount.
+  # Otherwise ClusterRole needs to be binded with the given ServiceAccount.
+  #
+  # The Role/ClusterRole needs to be created with resources: (services, configmaps, pods, secrets, endpoints)  and (verbs: get, watch, list)
+  #
+  # E.g:
+  #
+  #     apiVersion: rbac.authorization.k8s.io/v1
+  #     kind: Role
+  #     metadata:
+  #       labels:
+  #       name:  ocnrf-role
+  #       namespace: ocnrf
+  #     rules:
+  #       - apiGroups:
+  #           - ""
+  #         resources:
+  #           - services
+  #           - configmaps
+  #           - pods
+  #           - secrets
+  #           - endpoints
+  #         verbs:
+  #           - get
+  #           - list
+  #           - watch
+  serviceAccountName: ""
+
+  #@Engineering-start
+  # Engineering configuration
+  # Prometheus Scraping Configuration
+  prometheusScrapingConfig:
+    enabled: true
+    path: "/actuator/prometheus"
+
+  #@Engineering-end
+
+
+  # ********  Sub-Section Start: Ingress Gateway Global Parameters   ********
+  #**************************************************************************
+
+
+  # If Static load balancer IP needs to be set, then set staticIpAddressEnabled flag to true and provide value for staticIpAddress
+  # Else random IP will be assigned by the External LoadBalancer from its IP Pool
+  staticIpAddressEnabled: false
+  staticIpAddress: 10.75.212.50
+
+  # If Static node port needs to be set, then set staticNodePortEnabled flag to true and
+  # provide value for staticHttpNodePort or staticHttpsNodePort
+  # Else random node port will be assigned by K8
+  staticNodePortEnabled: false
+  staticHttpNodePort: 30080
+  staticHttpsNodePort: 30443
+
+  enableIncomingHttp: &enableIncomingHttpRef true
+  enableIncomingHttps: &enableIncomingHttpsRef false
+
+  # Service Port on which OCNRF's Ingress Gateway will be exposed
+  # If enableIncomingHttp is true, publicHttpSignalingPort will be used as HTTP/2.0 Port (unsecured)
+  # If enableIncomingHttps is true, publicHttpsSignallingPort Port will be used as HTTPS/2.0 Port (secured TLS)
+  publicHttpSignalingPort: &httpSignalPortRef 80
+  publicHttpsSignallingPort: &httpsSignalPortRef 443
+
+  #Configuration related to XFCC header validation/extraction
+  xfccHeaderValidation:
+    validation:
+      nfList:
+        - nf1.com
+      #@Engineering-start
+      # Engineering configuration
+      # exceptionType can take any of the valid values mentioned below. These values are the trigger cause of the error scenarios during xfcc validation
+      # XFCC_HEADER_NOT_PRESENT_OR_EMPTY,
+      # XFCC_MATCHCERTCOUNT_GREATER_THAN_CERTS_IN_HEADER,
+      # XFCC_HEADER_INVALID
+      errorTrigger:
+        - exceptionType: XFCC_HEADER_NOT_PRESENT_OR_EMPTY
+          errorCode: "401"
+          errorDescription: "xfcc header is not present or empty in the request at ingressgateway"
+          errorCause: "UNSPECIFIED_MSG_FAILURE"
+          errorTitle: "XFCC_HEADER_NOT_PRESENT_OR_EMPTY"
+          retryAfter: ""
+          redirectUrl: ""
+        - exceptionType: XFCC_MATCHCERTCOUNT_GREATER_THAN_CERTS_IN_HEADER
+          errorCode: "403"
+          errorDescription: "matchCerts count is greater than the certs in the request at ingressgateway"
+          errorCause: "UNSPECIFIED_MSG_FAILURE"
+          errorTitle: "XFCC_MATCHCERTCOUNT_GREATER_THAN_CERTS_IN_HEADER"
+          retryAfter: ""
+          redirectUrl: ""
+        - exceptionType: XFCC_HEADER_INVALID
+          errorCode: "403"
+          errorDescription: "xfcc header is invalid at ingressgateway"
+          errorCause: "UNSPECIFIED_MSG_FAILURE"
+          errorTitle: "XFCC_HEADER_INVALID"
+          retryAfter: ""
+          redirectUrl: ""
+      #@Engineering-end
+    extract:
+      enabled: false
+      #0//right most,-1//left most, 2-3rd from right most
+      certExtractIndex: 0
+      extractField: DNS
+      #0//right most,-1//left most, 2-3rd from right most
+      extractIndex: -1
+
+  # ********  Sub-Section End: Ingress Gateway Global Parameters   ********
+  #**************************************************************************
+
+
+  # ********  Sub-Section Start: Custom Extension Global Parameters ********
+  #**************************************************************************
+
+  customExtension:
+    allResources:
+      labels: {}
+      annotations: {}
+
+    lbServices:
+      labels: {}
+      annotations: {}
+
+    lbDeployments:
+      labels: {}
+      annotations: {}
+
+    nonlbServices:
+      labels: {}
+      annotations: {}
+
+    nonlbDeployments:
+      labels: {}
+      annotations: {}
+
+  # ********  Sub-Section End: Custiom Extensions Global Parameters ********
+  #**************************************************************************
+
+
+  # ********  Sub-Section Start: Prefix/Suffix Global Parameters ************
+  #**************************************************************************
+
+  k8sResource:
+    container:
+      prefix:
+      suffix:
+
+  # ********  Sub-Section End: Prefix/Suffix Global Parameters *************
+  #**************************************************************************
+
+  # ********  Sub-Section Start: Nfregistration  Global Parameters   ********
+  #**************************************************************************
+  # Engineering configuration
+  nfregistration:
+    portConfiguration:
+      # Port exposed by the service
+      servicePort : 8080
+      #container port
+      containerPort: 8081
+      #common service port
+      commonServicePort: &nfregistrationCommonServicePortRef 9090
+
+  # ********  Sub-Section End: Nfregistration  Global Parameters   ********
+  #**************************************************************************
+
+  # ********  Sub-Section Start: Nfsubscription  Global Parameters   ********
+  #**************************************************************************
+  # Engineering configuration
+  nfsubscription:
+    portConfiguration:
+      # Port exposed by the service
+      servicePort : 8080
+      #container port
+      containerPort: 8081
+      #common service port
+      commonServicePort: &nfsubscriptionCommonServicePortRef 9090
+
+  # ********  Sub-Section End: Nfsubscription  Global Parameters   ********
+  #**************************************************************************
+
+  # ********  Sub-Section Start: Nrfauditor  Global Parameters   ********
+  #**************************************************************************
+  # Engineering configuration
+  nrfauditor:
+    portConfiguration:
+      # Port exposed by the service
+      servicePort : 8080
+      #container port
+      containerPort: 8081
+      #common service port
+      commonServicePort: &nrfauditorCommonServicePortRef 9090
+
+  # ********  Sub-Section End: Nrfauditor  Global Parameters   ********
+  #**************************************************************************
+
+  # ********  Sub-Section Start: Nfdiscovery  Global Parameters   ********
+  #**************************************************************************
+  # Engineering configuration
+  nfdiscovery:
+    portConfiguration:
+      # Port exposed by the service
+      servicePort : 8080
+      #container port
+      containerPort: 8081
+      #common service port
+      commonServicePort: &nfdiscoveryCommonServicePortRef 9090
+
+  # ********  Sub-Section End: Nfdiscovery  Global Parameters   ********
+  #**************************************************************************
+
+  # ********  Sub-Section Start: Nrfconfiguration  Global Parameters   ********
+  #**************************************************************************
+  # Engineering configuration
+  nrfconfiguration:
+    portConfiguration:
+      # Port exposed by the service
+      servicePort : &configurationServicePortRef 8080
+      #container port
+      containerPort: 8081
+      #common service port
+      commonServicePort: &nrfconfigurationCommonServicePortRef 9090
+
+  # ********  Sub-Section End: Nrfconfiguration  Global Parameters   ********
+  #**************************************************************************
+
+  # ********  Sub-Section Start: Nfaccesstoken  Global Parameters   ********
+  #**************************************************************************
+  # Engineering configuration
+  nfaccesstoken:
+    portConfiguration:
+      # Port exposed by the service
+      servicePort : 8080
+      #container port
+      containerPort: 8081
+      #common service port
+      commonServicePort: &nfaccesstokenCommonServicePortRef 9090
+
+  # ********  Sub-Section End: Nfaccesstoken  Global Parameters   ********
+  #**************************************************************************
+
+  # ********  Sub-Section Start: NrfArtisan  Global Parameters   ********
+  #**************************************************************************
+  # Engineering configuration
+  nrfartisan:
+    portConfiguration:
+      # Port exposed by the service
+      servicePort : 8080
+      #container port
+      containerPort: 8081
+      #common service port
+      commonServicePort: &nrfartisanCommonServicePortRef 9090
+
+  # ********  Sub-Section End: NrfArtisan  Global Parameters   ********
+  #**************************************************************************
+  
+   # ********  Sub-Section Start: Alternate Route Global Parameters   ********
+  #**************************************************************************
+  # Engineering configuration
+  alternateroute:
+    portConfiguration:
+      # Port exposed by the service
+      servicePort : 80
+      #container port
+      containerPort: 8004
+      #common service port
+      commonServicePort: 9090
+
+  # ********  Sub-Section End: Alternate Route Global Parameters   ********
+  #**************************************************************************
+
+  # ******  Sub-Section Start: appinfo and perf-info Global Parameters ******
+  #**************************************************************************
+  # Engineering configuration
+  # Port exposed by the service
+  servicePorts:
+    appInfoHttp: 5906
+    perfInfoHttp: &perfInfoServicePortRef 5905
+  containerPorts:
+    monitoringHttp: 9090
+    appInfoHttp: 5906
+    perfInfoHttp: 5905
+  cncMetricsName: cnc-metrics
+  exposeObservabilityAtService: false
+  #Flag to Enable or Disable Diameter gateway service
+  diamGatewayEnable: false
+  
+  # ********  Sub-Section End: perf-info Global Parameters   ********
+  #**************************************************************************
+
+  # ********  Sub-Section Start: EGRESS-GATEWAY Global Parameters ********
+  # **********************************************************************
+  # Engineering configuration
+  egressGateway:
+    port: 8080
+    sslPort: 8442
+  # ********  Sub-Section End: EGRESS-GATEWAY Global Parameters **********
+  # **********************************************************************
+
+  # ********  Sub-Section Start: Helm Test Global Parameters   ********
+  #**************************************************************************
+  # Helm test hook related configurations
+  test:
+    nfName: changerelease
+    image:
+      name: helm-test
+      tag: *helmTestTagRef
+      pullPolicy: *imagePullPolicyRef
+    config:
+      logLevel: WARN
+      timeout: 240      #Beyond this duration in seconds helm test will be considered as failure
+    resources:
+    - horizontalpodautoscalers/v1
+    - deployments/v1
+    - configmaps/v1
+    - prometheusrules/v1
+    - serviceaccounts/v1
+    - poddisruptionbudgets/v1
+    - roles/v1
+    - statefulsets/v1
+    - persistentvolumeclaims/v1
+    - services/v1
+    - rolebindings/v1
+    complianceEnable: false
+
+  # ********  Sub-Section End: Helm Test Global Parameters   ********
+  #**************************************************************************
+
+
+  # ********  Sub-Section Start: Debug Tool Container Global Parameters   ********
+  #*******************************************************************************
+
+  # Allowed Values: DISABLED, ENABLED
+  # Preference is to set  "resources" request and limit to same values to avoid HPA issues.
+  extraContainers: DISABLED
+  debugToolContainerMemoryLimit: 4Gi
+  extraContainersVolumesTpl: |
+    - name: debug-tools-dir
+      emptyDir:
+        medium: Memory
+        sizeLimit: {{ .Values.global.debugToolContainerMemoryLimit | quote }}
+  extraContainersTpl: |
+    - command:
+        - /bin/sleep
+        - infinity
+      image: {{ printf "%s/%s:%s" (include "getdockerregistry.name" .) "ocdebug-tools" (include "getocdebugtool.version" .) }} 
+      imagePullPolicy: {{ printf "%s" .Values.global.imagePullPolicy }}
+      name: {{ printf "%s-tools-%s" (include "getprefix" .) (include "getsuffix" .) | trunc 63 | trimPrefix "-" | trimSuffix "-"  }}
+      resources:
+        requests:
+          ephemeral-storage: "512Mi"
+          cpu: "0.5"
+          memory: {{ .Values.global.debugToolContainerMemoryLimit | quote }}
+        limits:
+          ephemeral-storage: "512Mi"
+          cpu: "0.5"
+          memory: {{ .Values.global.debugToolContainerMemoryLimit | quote }}
+      securityContext:
+        allowPrivilegeEscalation: true
+        capabilities:
+          drop:
+          - ALL
+          add:
+          - NET_RAW
+          - NET_ADMIN
+        runAsUser: 7000
+      volumeMounts:
+        - mountPath: /tmp/tools
+          name: debug-tools-dir
+
+  # ********  Sub-Section End: Debug Tool Container Global Parameters   ********
+  #*******************************************************************************
+
+
+#########################################################
+#            Section End  : global attributes           #
+#########################################################
+
+
+#########################################################
+#            Section Start: ingressgateway attributes   #
+#########################################################
+ingress-gateway:
+
+  global:
+    # Service Type
+    type: LoadBalancer
+
+    # For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    ephemeralStorageLimit: 1024
+
+    #@Engineering-start
+    # Engineering configuration
+    #CONFIGUREABLE ERROR CODES
+    configurableErrorCodes:
+      enabled: true
+      errorScenarios:
+        - exceptionType: "ConnectionTimeout"
+          errorProfileName: "ERR_100"
+        - exceptionType: "RequestTimeout"
+          errorProfileName: "ERR_200"
+        - exceptionType: "UnknownHostException"
+          errorProfileName: "ERR_300"
+        - exceptionType: "ConnectException"
+          errorProfileName: "ERR_400"
+        - exceptionType: "RejectedExecutionException"
+          errorProfileName: "ERR_500"
+        - exceptionType: "BlackListIpException"
+          errorProfileName: "ERR_600"
+        - exceptionType: "ClosedChannelException"
+          errorProfileName: "ERR_700"
+        - exceptionType: "NotFoundException"
+          errorProfileName: "ERR_800"
+        - exceptionType: "InternalError"
+          errorProfileName: "ERR_900"
+        - exceptionType: "LateArrivalException"
+          errorProfileName: "ERR_1000"
+        - exceptionType: "CCA_HEADER_VALIDATION_FAILURE"
+          errorProfileName: "ERR_CCA_HEADER_VALIDATION"
+
+    errorCodeProfiles:
+        - name: ERR_100
+          errorCode: "408"
+          errorDescription: "Connection timeout at ingressgateway"
+          errorCause: "UNSPECIFIED_NF_FAILURE"
+          errorTitle: "ConnectionTimeout"
+        - name: ERR_200
+          errorCode: "408"
+          errorDescription: "Request Timeout at ingressgateway"
+          errorCause: "UNSPECIFIED_NF_FAILURE"
+          errorTitle: "RequestTimeout"
+        - name: ERR_300
+          errorCode: "503"
+          errorDescription: "SERVICE_UNAVAILABLE"
+          errorCause: "UNSPECIFIED_NF_FAILURE"
+          errorTitle: "UnknownHostException"
+        - name: ERR_400
+          errorCode: "503"
+          errorDescription: "Connection failure at ingressgateway"
+          errorCause: "UNSPECIFIED_NF_FAILURE"
+          errorTitle: "ConnectException"
+        - name: ERR_500
+          errorCode: "503"
+          errorDescription: "Rejected Execution at ingressgateway"
+          errorCause: "UNSPECIFIED_NF_FAILURE"
+          errorTitle: "RejectedExecutionException"
+        - name: ERR_600
+          errorCode: "401"
+          errorDescription: "Black listed IP at ingressgateway"
+          errorCause: "UNSPECIFIED_MSG_FAILURE"
+          errorTitle: "BlackListIpException"
+        - name: ERR_700
+          errorCode: "503"
+          errorDescription: "Closed channel at ingressgateway"
+          errorCause: "UNSPECIFIED_NF_FAILURE"
+          errorTitle: "ClosedChannelException"
+        - name: ERR_800
+          errorCode: "404"
+          errorDescription: "Not Found at ingressgateway"
+          errorCause: "UNSPECIFIED_MSG_FAILURE"
+          errorTitle: "NotFoundException"
+        - name: ERR_900
+          errorCode: "500"
+          errorDescription: "Internal Processing error at ingressgateway"
+          errorCause: "UNSPECIFIED_MSG_FAILURE"
+          errorTitle: "InternalError"
+        - name: ERR_1000
+          errorCode: "504"
+          errorDescription: "Request has already expired at ingressgateway"
+          errorCause: "TIMED_OUT_REQUEST"
+          errorTitle: "LateArrivalException"
+        - name: ERR_CCA_HEADER_VALIDATION
+          errorCode: 403
+          errorCause: "CCA_VERIFICATION_FAILURE"
+          errorTitle: "CCA_HEADER_INVALID"
+          errorDescription: ""
+    #@Engineering-end
+  
+  # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'  
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule" 
+
+  # Engineering configuration
+  # Maximum Unavailable ingressgateway pods during pod disruption.
+  # By default the global configured value will be used. 
+  # The reference variable needs to be replaced with absolute 
+  # value, in case per micro-service value needs to be changed.
+  maxUnavailable: *maxPdbUnavailableRef
+
+  #@Engineering-start
+  gracefulShutdown:
+    # Grace period to wait for active requests to be executed
+    # If there are no active requests then this period is neglected
+    gracePeriod: 1m # 's' in case of seconds and 'm' in case of minutes
+    # Configurable error code to be sent when new requests are sent during shutdown phase
+    defaultErrorCode: 500
+    errorDescription: ""
+    errorCause: "UNSPECIFIED_NF_FAILURE"
+    errorTitle: ""
+    retryAfter: ""
+    redirectUrl: ""
+      #@Engineering-end
+
+  # This flag is for enabling/disabling HTTP/2.0  (insecure) in Ingress Gateway.
+  # If the value is set to false, NRF will not accept any HTTP/2.0 (insecure) Traffic
+  # If the value is set to true, NRF will accept HTTP/2.0 (insecure) Traffic
+  enableIncomingHttp: *enableIncomingHttpRef
+
+  # This flag is for enabling/disabling HTTPS/2.0  (secured TLS) in Ingress Gateway.
+  # If the value is set to false, NRF will not accept any HTTPS/2.0 (secured) Traffic
+  # If the value is set to true, NRF will accept HTTPS/2.0 (secured) Traffic
+  enableIncomingHttps: *enableIncomingHttpsRef
+
+  # Set below flag to true when deployed in Ipv6 enabled setup
+  isIpv6Enabled: false
+
+  #@Engineering-start
+  # Engineering configuration
+  # This flag is for enabling/disabling HTTPS/2.0  (secured TLS) in Ingress Gateway towards Microservices.
+  enableOutgoingHttps: false
+
+  # Engineering configuration
+  nameOverride: ingressgateway
+  #@Engineering-end
+
+  # Ingress Gateway Service Container Image Details
+  image:
+    # Ingress Gateway image name
+    name: ocingress_gateway
+    # tag name of image
+    tag: *gwTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+  # Ingress Gateway Init  Container Image Details
+  initContainersImage:
+    # init Containers image name
+    name: configurationinit
+    # tag name of init Container image
+    tag: *gwTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+
+  # Ingress Gateway Update Container Image Details
+  updateContainersImage:
+    # update Containers image name
+    name: configurationupdate
+    # tag name of update Container image
+    tag: *gwTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+  # Common Config hook
+  dbHookImage:
+    # image name
+    name: common_config_hook
+    # tag 
+    tag: *gwTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+  #@Engineering-start
+  # Engineering configuration
+  # This attribute is for to set the config mode for cca in Ingress Gateway.
+  ccaHeaderValidationConfigMode: REST
+  #@Engineering-end
+
+  #CCA header validation Configuration
+  ccaHeaderValidation:
+    #@Engineering-start
+    enabled: false
+    minExpiryTime: 0
+    maxTokenAge: 0
+    role: NRF
+    subKey: subjectAltName
+    validationRule: strict #supported values are strict,relaxed
+    ccaReloadCertInterval: 600000 #this scheduler will be used to load/update certificate in interval of milliseconds
+    #@Engineering-end
+    k8SecretName: ocingress-secret
+    k8NameSpace: changens
+    fileName: caroot.cer
+    
+
+  #@Engineering-start
+  # Engineering configuration
+  ports:
+    actuatorPort: 9090
+    containerPort: 8081
+    containersslPort: 8443
+  #@Engineering-end
+
+  # enable Jaeger tracing
+  jaegerTracingEnabled: false
+  openTracing :
+    jaeger:
+      udpSender:
+        # Update this configuration when jaeger tracing is enabled.
+        # udpsender host
+        host: "jaeger-agent.cne-infra"
+        # udpsender port
+        port: 6831
+      # Jaeger message sampler. Value range: 0 to 1
+      # e.g. Value 0: No Trace will be sent to Jaeger collector
+      # e.g. Value 0.3: 30% of message will be sampled and will be sent to Jaeger collector
+      # e.g. Value 1: 100% of message (i.e. all the messages) will be sampled and will be sent to Jaeger collector
+      probabilisticSampler: 0.5
+
+  # Allowed CipherSuites for TLS1.2
+  cipherSuites:
+    - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+    - TLS_DHE_RSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+
+  service:
+    # configuration under ssl section is mandatory if enableIncomingHttps is configured as "true"
+    ssl:
+      #@Engineering-start
+      # Engineering configuration: Supported TLS Version
+      tlsVersion: TLSv1.2
+      #@Engineering-end
+
+      # OCNRF private key details for HTTPS
+      # Secret Name, Namespace, Keydetails
+      privateKey:
+        k8SecretName: ocingress-secret
+        k8NameSpace: ingress-ns
+        rsa:
+          fileName: rsa_private_key_pkcs1.pem
+        ecdsa:
+          fileName: ssl_ecdsa_private_key.pem
+
+      # OCNRF certificate details for HTTPS
+      # Secret Name, Namespace, Keydetails
+      certificate:
+        k8SecretName: ocingress-secret
+        k8NameSpace: ingress-ns
+        rsa:
+          fileName: ssl_rsa_certificate.crt
+        ecdsa:
+          fileName: ssl_ecdsa_certificate.crt
+
+      # OCNRF CA details for HTTPS
+      caBundle:
+        k8SecretName: ocingress-secret
+        k8NameSpace: ingress-ns
+        fileName: caroot.cer
+
+      # OCNRF KeyStore password for HTTPS
+      # Secret Name, Namespace, Keydetails
+      keyStorePassword:
+        k8SecretName: ocingress-secret
+        k8NameSpace: ingress-ns
+        fileName: ssl_keystore.txt
+
+      # OCNRF TrustStore password for HTTPS
+      # Secret Name, Namespace, Keydetails
+      trustStorePassword:
+        k8SecretName: ocingress-secret
+        k8NameSpace: ingress-ns
+        fileName: ssl_truststore.txt
+
+      # Initial Algorithm for HTTPS
+      # Supported Values: ES256, RS256
+      initialAlgorithm: ES256
+
+    # Labels and Annotations that are specific to service ingressgateway are added here.
+    customExtension:
+      labels: {}
+      annotations:
+        oracle.com.cnc/app-protocols: '{"http2-tcp":"HTTP2","http2-tls":"HTTP2"}'
+
+  # Labels and Annotations that are specific to deployment ingressgateway are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  nfInstanceId: *nrfInstanceIdRef
+  #@Engineering-start
+  # Engineering configuration: OAUTH CONFIGURATION
+  oauthValidatorEnabled: false
+  nfType: NRF
+  producerScope: nnrf-nfm, nnrf-disc
+  allowedClockSkewSeconds: 0
+  nrfPublicKeyKubeSecret: ocingress-secret
+  nrfPublicKeyKubeNamespace: ocnrf
+  validationType: strict
+  producerPlmnMNC: ''
+  producerPlmnMCC: ''
+
+  log:
+    # setting logging level
+    # Possible values - OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE
+    level:
+      root: WARN
+      ingress: WARN
+      oauth: WARN
+      updateContainer: WARN
+      configclient: WARN
+      hook: WARN
+      cncc:
+        security: WARN
+    traceIdGenerationEnabled: true
+  #@Engineering-end
+
+  startupProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 30
+    # specifies that the kubelet should perform a startup probe every xx seconds
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 6
+
+  readinessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 30
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 10
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 30
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 3
+
+  # Resource details
+  resources:
+    limits:
+      #Container's cpu and memory
+      #@min_resources- cpu: 1
+      cpu: 4
+      # Init-service cpu limit
+      initServiceCpu: 1
+      # Update-service cpu limit
+      updateServiceCpu: 1
+      # The Container's memory limit
+      #@min_resources- memory: 1Gi
+      memory: 4Gi
+      # Init-service memory limit
+      initServiceMemory: 1Gi
+      # Update-service memory limit
+      updateServiceMemory: 1Gi
+    requests:
+      # The Container's memory cpu
+      #@min_resources- cpu: 1
+      cpu: 4
+      # Init-service cpu limit
+      initServiceCpu: 1
+      # Update-service cpu limit
+      updateServiceCpu: 1
+      # The Container's memory limit
+      #@min_resources- memory: 1Gi
+      memory: 4Gi
+      # Init-service memory limit
+      initServiceMemory: 1Gi
+      # Update-service memory limit
+      updateServiceMemory: 1Gi
+    target:
+      averageCpuUtil: 80
+
+  # Min replicas to scale to maintain an average CPU utilization
+  #@min_resources- minReplicas: 1
+  minReplicas: 2
+  # Max replicas to scale to maintain an average CPU utilization
+  maxReplicas: 20
+
+  #Message Copy Feature 
+  messageCopy:
+    #parameter to enable or disable message copy at the IGW
+    enabled: false
+    #Flag enabling/disabling message payload(HTTP message body) in the feed towards DD
+    copyPayload: true
+    #List of comma-separated Kafka topic names on which message will published
+    topicName: NRF
+    #whether to wait for acknowledgement from kafka or not.
+    #if set to false it will Fire & Forget
+    ackRequired: false
+    #No of retries if message wasn’t sent to kafka
+    retryOnFailure: 0
+    security:
+      #to enable the SSL/SASL_SSL based communication between NRF and DD
+      enabled: false
+      #security mechanism using which NRF and DD will communicate
+      protocol: SASL_SSL
+      #defines the supported TLS version by NRF
+      tlsVersion: TLSv1.2
+      saslConfiguration:
+        #username to authenticate NRF with Data Director 
+        userName: ocnadd
+        password:
+          #authentication password will store in a secret and secret name should be mentioned here
+          k8SecretName: ocingress-secret-sasl
+          #deployment namespace in which secret is created
+          k8NameSpace: ingress-ns
+          #password filename which is been used to create a secret
+          fileName: password.txt
+    #@Engineering-start
+    # Engineering Configuration: Thread configuration for performance
+    threadPoolConfigurations:
+      #always configure coreSize & maxSize with same value
+      #this will ensure that we have fixed size thread pool, which eliminates the performance overhead of thread creation at runtime
+      coreSize: 16
+      maxSize: 16
+      #the maximum number of message copy events that may remain on a queue once published
+      queueCapacity: 3000
+    #@Engineering-end  
+
+  #kafka-details
+  kafka:
+    #DD kafka server address
+    bootstrapAddress:
+
+  #@Engineering-start
+  # Engineering Configuration: Thread configuration for performance
+  applicationThreadPoolConfig:
+    corePoolSize: 16
+    maxPoolSize: 16
+    queueCapacity: 3000
+  #@Engineering-end
+
+
+  # Engineering Configuration:  Micro-Service routes
+  # NOTE: These Configurations must be updated whenever template service.fullname
+  # or service http port is modified.
+  ######################################################################################################################
+  #                             READ ONLY CONFIGURATION - SHOULD NOT BE CHANGED - START                                #
+  ######################################################################################################################
+  routesConfig:
+    - id: registration_mapping
+      uri: http://{{ template "registration.service.fullname" . }}:{{ template "registration.service.port" . }}
+      path: /nnrf-nfm/v1/nf-instances/**
+      order: 1
+      filters:
+        controlledShutdownFilter:
+          applicableShutdownStates:
+            - COMPLETE_SHUTDOWN
+    - id: subscription_mapping
+      uri: http://{{ template "subscription.service.fullname" . }}:{{ template "subscription.service.port" . }}
+      path: /nnrf-nfm/v1/subscriptions/**
+      order: 2
+      filters:
+        controlledShutdownFilter:
+          applicableShutdownStates:
+            - COMPLETE_SHUTDOWN
+    - id: disc_mapping
+      uri: http://{{ template "discovery.service.fullname" . }}:{{ template "discovery.service.port" . }}
+      path: /nnrf-disc/v1/nf-instances/**
+      order: 3
+      filters:
+        controlledShutdownFilter:
+          applicableShutdownStates:
+            - COMPLETE_SHUTDOWN
+    - id: accesstoken_mapping
+      uri: http://{{ template "accesstoken.service.fullname" . }}:{{ template "accesstoken.service.port" . }}
+      path: /oauth2/token
+      order: 4
+      filters:
+        controlledShutdownFilter:
+          applicableShutdownStates:
+            - COMPLETE_SHUTDOWN
+      ######################################################################################################################
+      #                             READ ONLY CONFIGURATION - SHOULD NOT BE CHANGED - END                                  #
+      ######################################################################################################################
+      metadata:
+        ccaHeaderValidation:
+          # TO ENABLE CCA FEATURE ONLY FOR ACCESS TOKEN MICROSERVICE
+          # Allowed Values: true , false
+          enabled: false
+
+  #@Engineering-start
+  # Engineering Configuration: Jetty Client settings
+  maxRequestsQueuedPerDestination: 5000
+
+  # Engineering Configuration: Below value will be used when serviceMeshCheck is enabled
+  maxConnectionsPerDestination: 16
+  maxConnectionsPerIp: 16
+  #Jetty Client settings
+  maxConcurrentPushedStreams: 5000
+  connectionTimeout: 10000 #(ms)
+  requestTimeout: 6000 #(ms)
+  webclient:
+    threadSizeMultiByCore: 2
+    threadQueueCapacity: 100000
+  #@Engineering-end
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+  #@Engineering-start
+  # With thread re-design that went in IGW/EGW, these flags are not required anymore.
+  # Hence these configuration will be deperecated in IGW/EGW in coming releases
+  # Making closeConnectionOnException to false by default
+  nettyInboundExceptionHandler: true
+  closeConnectionOnException: false
+
+  #Netty Idle Timeout Settings (ms)
+  nettyIdleTimeout: 0
+  #@Engineering-end
+
+  #@Engineering-start
+  # This configuration is to enable or disable the nf specific default value configuration
+  nfSpecificConfig:
+    enabled: false
+    featureList:
+      - ocpolicymapping
+      - ocdiscardpolicies
+      - errorcodeprofiles
+      - errorcodeserieslist
+      - routesconfiguration
+  #@Engineering-end
+
+  #@Engineering-start
+  #To allow igw to redirect to uri present in location header in case of 301,308,302,303,307 response code
+  #set autoRedirect to true otherwise set it to false. Default value is true
+  autoRedirect: false
+  # Engineering Configuration:  Micro-Service routes
+  # Common configuration service
+  commonCfgClient:
+    # Flag to enable/ disable the feature
+    enabled: true
+  commonCfgServer:
+    configServerSvcName: nrfconfiguration
+    port: *configurationServicePortRef
+    pollingInterval: 5000
+  # Common service name that is currently expecting updates from server
+  commonServiceName: *ingressCommonSvcNameRef
+  restoreBackupOnInstall: false
+  #@Engineering-end
+  #Db hook Configuration
+  # Engineering configuration to select database (read only)
+  dbConfig:
+    dbHost: *mySqlHostRef
+    dbPort: *mySqlPortRef
+    secretName: *privilegedSecretNameRef
+    dbName: *dbNameRef
+    dbEngine: *databaseEngineRef
+    #@Engineering-start
+    # Name of the Key configured for "DB Username" in Secret with following name: "<dbConfig.secretName>"
+    dbUNameLiteral: *dbUserRef
+    # Name of the Key configured for "DB Password" in Secret with following name: "<dbConfig.secretName>"
+    dbPwdLiteral: *dbPwdRef
+    #@Engineering-end
+  #@Engineering-start
+  #Dns refresh interval customized to minimalize traffic loss during issu
+  dnsRefreshDelay: 2000
+  #@Engineering-end
+
+  # The flag is used to enable the controlled shutdown feature
+  enableControlledShutdown: *controlledShutdownRef
+  #@Engineering-start
+  # The flag is used to enable REST based configurations for controlledShutdown feature
+  controlledShutdownConfigMode: REST
+  # The flag is used to enable REST mode for routes configurations
+  routeConfigMode: HELM
+  # The flag is used to indicate the existing Helm routes need to be converted to REST mode
+  convertHelmRoutesToREST: false
+  #@Engineering-end
+
+#########################################################
+#            Section End  : ingressgateway attributes   #
+#########################################################
+
+
+#########################################################
+#            Section Start: egressgateway attributes   #
+#########################################################
+egress-gateway:
+
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    ephemeralStorageLimit: 1024
+
+  # This flag is for enabling/disabling HTTPS/2.0  (secured TLS) in Egress Gateway.
+  # If the value is set to false, NRF will send only HTTP/2.0 (unsecured) Egress Traffic
+  # If the value is set to true, NRF will send only HTTPS/2.0 (secured) Egress Traffic
+  enableOutgoingHttps: false
+  
+  # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue' 
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+
+  # SNI Support
+  sniHeader:
+    enabled: false
+
+  #@Engineering-start
+  # Engineering Configuration: Jetty Client settings
+  maxRequestsQueuedPerDestination: 5000
+  maxConcurrentPushedStreams: 5000
+  maxConnectionsPerDestination: 10
+  maxConnectionsPerIp: 10
+  webclient:
+    threadSizeMultiByCore: 2
+    threadQueueCapacity: 100000
+  #@Engineering-end
+
+
+  # Engineering configuration
+  # Maximum Unavailable egressgateway pods during pod disruption.
+  # By default the global configured value will be used. 
+  # The reference variable needs to be replaced with absolute 
+  # value, in case per micro-service value needs to be changed.
+  maxUnavailable: *maxPdbUnavailableRef
+
+  #@Engineering-start
+  # Engineering Configuration:
+  nameOverride: egressgateway
+
+  serviceEgressGateway:
+    actuatorPort: 9090
+  #@Engineering-end
+
+  # Egress Gateway Service Container Image Details
+  deploymentEgressGateway:
+    # Egress Gateway image name
+    image: ocegress_gateway
+    # tag name of image
+    imageTag: *gwTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+  # Egress Gateway Init Container Image Details
+  initContainersImage:
+    # init Containers image name
+    name: configurationinit
+    # tag name of image
+    tag: *gwTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+
+  # Egress Gateway Update Container Image Details
+  updateContainersImage:
+    # update Containers image name
+    name: configurationupdate
+    # tag name of image
+    tag: *gwTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+  # Common Config hook
+  dbHookImage:
+    # image name
+    name: common_config_hook
+    # tag 
+    tag: *gwTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+  # This flag needs to set it "true" if Service Mesh would be present where OCNRF will be deployed
+  # This is to enable egress gateway to forward http2 (and not https) requests even when it receives http2 requests
+  httpRuriOnly: "false"
+
+  # enable Jaeger tracing
+  jaegerTracingEnabled: false
+  openTracing :
+    jaeger:
+      udpSender:
+        # Update this configuration when jaeger tracing is enabled.
+        # udpsender host
+        host: "jaeger-agent.cne-infra"
+        # udpsender port
+        port: 6831
+      # Jaeger message sampler. Value range: 0 to 1
+      # e.g. Value 0: No Trace will be sent to Jaeger collector
+      # e.g. Value 0.3: 30% of message will be sampled and will be sent to Jaeger collector
+      # e.g. Value 1: 100% of message (i.e. all the messages) will be sampled and will be sent to Jaeger collector
+      probabilisticSampler: 0.5
+  oauthClient:
+    enabled: true
+    staticNrfList:
+      - '{{ template "accesstoken.service.fullname" . }}:{{ template "accesstoken.service.port" . }}'
+    nfType: NRF
+    nfInstanceId: *nrfInstanceIdRef
+
+  #@Engineering-start
+  # Engineering Configuration:
+  consumerPlmnMNC: 11
+  consumerPlmnMCC: 111
+    #@Engineering-end
+
+  #@Engineering-start
+  # ********  Sub-Section Start: SCP released Parameters ********
+  #*******************************************************************
+
+  # Using SCP as an Proxy in Egress Gateway
+  # If it is configured as false, SCP will not be used as an proxy.
+  #   Messages will be directly sent to the Producers/HTTP Servers.
+  # If it is configured as true, SCP will be used as an Proxy for
+  #    delivering messages to the Producers/HTTP Servers.
+  scp:
+    # SCP Configuration For Egress Gateway
+    # All the SCP related configuration will be used only
+    # if scpIntegrationEnabled is set to true.
+    scpIntegrationEnabled: false
+
+    # SCP's default scheme  when 3gpp-sbi-target-apiroot header is missing
+    scpDefaultScheme: https
+
+    # Set this flag to true if re-routing to multiple SCP instances is to be enabled.
+    scpRerouteEnabled: true
+
+    # SCP's HTTP Host/IP and Port Combinations.
+    # These will be while sending HTTP/2 and HTTPS/2 Egress traffic
+    instances:
+      scpSets:
+        - setId: 0
+          httpConfigs:
+            - host: scp-host-1
+              port: 101
+              apiPrefix: "/"   # Change this value to corresponding prefix "/" is not expected to be provided along.
+            - host: scp-host-2
+              port: 102
+              apiPrefix: "/"
+          httpsConfigs:
+            - host: scp-host-3
+              port: 4431
+              apiPrefix: "/"
+            - host: scp-host-4
+              port: 4434
+              apiPrefix: "/"
+
+
+
+  # ********  Sub-Section End : SCP released Parameters ********
+  #*******************************************************************
+  #@Engineering-end
+
+  # Allowed CipherSuites for TLS1.2
+  cipherSuites:
+    - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+    - TLS_DHE_RSA_WITH_AES_256_GCM_SHA384
+    - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+
+  service:
+    # configuration under ssl section is mandatory if enableOutgoingHttps is configured as "true"
+    ssl:
+      #@Engineering-start
+      # Engineering configuration: Support TLS Version.
+      tlsVersion: TLSv1.2
+      #@Engineering-end
+
+      # OCNRF private key details for HTTPS
+      # Secret Name, Namespace, Keydetails
+      privateKey:
+        k8SecretName: ocegress-secret
+        k8NameSpace: egress-ns
+        rsa:
+          fileName: ssl_rsa_private_key.pem
+        ecdsa:
+          fileName: ssl_ecdsa_private_key.pem
+
+      # OCNRF certificate details for HTTPS
+      # Secret Name, Namespace, Keydetails
+      certificate:
+        k8SecretName: ocegress-secret
+        k8NameSpace: egress-ns
+        rsa:
+          fileName: ssl_rsa_certificate.crt
+        ecdsa:
+          fileName: ssl_ecdsa_certificate.crt
+
+      # OCNRF CA details for HTTPS
+      caBundle:
+        k8SecretName: ocegress-secret
+        k8NameSpace: egress-ns
+        fileName: ssl_cabundle.crt
+
+      # OCNRF KeyStore password for HTTPS
+      # Secret Name, Namespace, Keydetails
+      keyStorePassword:
+        k8SecretName: ocegress-secret
+        k8NameSpace: egress-ns
+        fileName: ssl_keystore.txt
+
+      # OCNRF TrustStore password for HTTPS
+      # Secret Name, Namespace, Keydetails
+      trustStorePassword:
+        k8SecretName: ocegress-secret
+        k8NameSpace: egress-ns
+        fileName: ssl_truststore.txt
+
+      # Initial algorithm for HTTPS
+      # Support Values: ES256, RS256
+      initialAlgorithm: ES256
+
+    # Service Type
+    type: ClusterIP
+
+    # Labels and Annotations that are specific to service egressgateway are added here.
+    customExtension:
+      labels: {}
+      annotations: {}
+
+    # Labels and Annotations that are specific to deployment egressgateway are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  #@Engineering-start
+  log:
+    # setting logging level
+    # Possible values - OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE
+    level:
+      root: WARN
+      egress: WARN
+      oauth: WARN
+      updateContainer: WARN
+      configclient: WARN
+      hook: WARN
+  #@Engineering-end
+
+  startupProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 30
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a startup probe every xx seconds
+    periodSeconds: 10
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 6
+
+  readinessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 30
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 10
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 30
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 3
+
+  #@Engineering-start
+  # Flag to configure default route in Egress Gateway. Configure this flag when sbiRoutingConfigMode and routeConfigMode are configured as REST
+  configureDefaultRoute: true
+  # Mode of operation for sbiRouting. Possible values are HELM, REST
+  sbiRoutingConfigMode: REST
+  # Mode of configuration for configuring routes. Possible values are HELM, REST
+  routeConfigMode: REST
+  #Note: routeConfigMode - REST and sbiRoutingConfigMode - HELM is not a valid configuration
+  #@Engineering-end
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 6
+      initServiceCpu: 1
+      updateServiceCpu: 1
+      #@min_resources- memory: 1Gi
+      memory: 4Gi
+      # Init-service memory limit
+      initServiceMemory: 1Gi
+      # Update-service memory limit
+      updateServiceMemory: 1Gi
+    requests:
+      initServiceCpu: 1
+      updateServiceCpu: 1
+      # Init-service memory limit
+      initServiceMemory: 1Gi
+      # Update-service memory limit
+      updateServiceMemory: 1Gi
+      #@min_resources- cpu: 1
+      cpu: 6
+      #@min_resources- memory: 1Gi
+      memory: 4Gi
+    target:
+      averageCpuUtil: 80
+
+  # Min replicas to scale to maintain an average CPU utilization
+  #@min_resources- minReplicas: 1
+  minReplicas: 2
+  # Max replicas to scale to maintain an average CPU utilization
+  maxReplicas: 12
+
+  #@Engineering-start
+  # Engineering Configuration:
+  requestTimeout: 3000 #(ms)
+  #@Engineering-end
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+  #@Engineering-start
+  # With thread re-design that went in IGW/EGW, these flags are not required anymore.
+  # Hence these configuration will be deperecated in IGW/EGW in coming releases
+  # Making closeConnectionOnException to false by default
+  nettyInboundExceptionHandler: true
+  closeConnectionOnException: false
+
+  #Netty Idle Timeout Settings (ms)
+  nettyIdleTimeout: 0
+  #@Engineering-end
+
+  #Message Copy Feature
+  messageCopy:
+    #parameter to enable or disable message copy at the EGW
+    enabled: false
+    #Flag enabling/disabling message payload(HTTP message body) in the feed towards DD
+    copyPayload: true
+    #List of comma-separated Kafka topic names on which message will published
+    topicName: NRF
+    #whether to wait for acknowledgement from kafka or not.
+    #if set to false it will Fire & Forget
+    ackRequired: false
+    #No of retries if message wasn’t sent to kafka
+    retryOnFailure: 0
+    security:
+      #to enable the SSL/SASL_SSL based communication between NRF and DD
+      enabled: false
+      #security mechanism using which NRF and DD will communicate
+      protocol: SASL_SSL
+      #defines the supported TLS version by NRF
+      tlsVersion: TLSv1.2
+      saslConfiguration:
+        #username to authenticate NRF with Data Director
+        userName: ocnadd
+        password:
+          #authentication password will store in a secret and secret name should be mentioned here
+          k8SecretName: ocegress-secret-sasl
+          #deployment namespace in which secret is created
+          k8NameSpace: egress-ns
+          #password filename which is been used to create a secret
+          fileName: password.txt
+    #@Engineering-start
+    # Engineering Configuration: Thread configuration for performance
+    threadPoolConfigurations:
+      #always configure coreSize & maxSize with same value
+      #this will ensure that we have fixed size thread pool, which eliminates the performance overhead of thread creation at runtime
+      coreSize: 16
+      maxSize: 16
+      #the maximum number of message copy events that may remain on a queue once published
+      queueCapacity: 3000
+    #@Engineering-end   
+
+  #kafka-details
+  kafka:
+    #DD kafka server address
+    bootstrapAddress:
+
+  #@Engineering-start
+  # Engineering Configuration: Thread configuration for performance
+  applicationThreadPoolConfig:
+    corePoolSize: 16
+    maxPoolSize: 16
+    queueCapacity: 3000
+  #@Engineering-end  
+
+  #@Engineering-start
+  #To allow igw to redirect to uri present in location header in case of 301,308,302,303,307 response code
+  #set autoRedirect to true otherwise set it to false. Default value is true
+  autoRedirect: false
+  # Engineering Configuration:
+  # Common configuration service
+  commonCfgClient:
+    # Flag to enable/ disable the feature
+    enabled: true
+  # Details of common configuration service for polling
+  commonCfgServer:
+    configServerSvcName: nrfconfiguration
+    port: *configurationServicePortRef
+    pollingInterval: 5000
+  # Common service name that is currently expecting updates from server
+  commonServiceName: *egressCommonSvcNameRef
+  restoreBackupOnInstall: false
+  #@Engineering-end
+
+  #Db hook Configuration
+  # Engineering configuration to select database (read only)
+  dbConfig:
+    dbHost: *mySqlHostRef
+    dbPort: *mySqlPortRef
+    secretName: *privilegedSecretNameRef
+    dbName: *dbNameRef
+    dbEngine: *databaseEngineRef
+    #@Engineering-start
+    # Name of the Key configured for "DB Username" in Secret with following name: "<dbConfig.secretName>"
+    dbUNameLiteral: *dbUserRef
+    # Name of the Key configured for "DB Password" in Secret with following name: "<dbConfig.secretName>"
+    dbPwdLiteral: *dbPwdRef
+    #@Engineering-end
+  #@Engineering-start
+  #Dns refresh interval customized to minimalize traffic loss during issu
+  dnsRefreshDelay: 2000
+  #@Engineering-end
+
+  # The flag is used to enable the controlled shutdown feature
+  enableControlledShutdown: *controlledShutdownRef
+  #@Engineering-start
+  # The flag is used to enable REST based configurations for controlledShutdown feature
+  controlledShutdownConfigMode: REST
+  # enableSecondaryInstance , ingressServiceName  and ingressReleaseVersion should be configured only in the case of controlled shutdown and for egress gateway only.
+  enableSecondaryInstance: true
+  ingressServiceName: *ingressCommonSvcNameRef
+  ingressReleaseVersion: *gwTagRef
+  #@Engineering-end
+
+#########################################################
+#            Section End  : egressgateway attributes   #
+#########################################################
+
+
+#########################################################
+#            Section Start: nfregistration attributes   #
+#########################################################
+# NRF microservices
+nfregistration:
+
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    ephemeralStorageLimit: 1024
+    overrideReplicationCheck: "false"
+    #@Engineering-start
+    #Upgrade strategy, maxUnavailable pods declared for upgrade process
+    #The only supported upgrade strategy is RollingUpdate
+    upgradeStrategy: "RollingUpdate"
+    #@Engineering-end
+
+    # Engineering configuration
+    # Maximum Unavailable nfregistration pods during pod disruption.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxPdbUnavailable: *maxPdbUnavailableRef
+
+    # Engineering configuration
+    # Maximum Unavailable nfregistration pods during upgrade.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxUnavailable: *maxUnavailableRef
+
+  #@Engineering-start
+  enabled: true
+  #@Engineering-end
+  image:
+    # image name
+    name: ocnrf-nfregistration
+    # tag name of image
+    tag: *nrfTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+  # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'  
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- memory: 1Gi
+      memory: 3Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- memory: 1Gi
+      memory: 3Gi
+    target:
+      averageCpuUtil: 80
+
+  # Min replicas to scale to maintain an average CPU utilization
+  #@min_resources- minReplicas: 1
+  minReplicas: 2
+  # Max replicas to scale to maintain an average CPU utilization
+  maxReplicas: 2
+  
+  hookRestartPolicy: Never
+
+  hooks:
+    preValidateEnabled: *preValidateEnabledRef
+    postValidateEnabled: *postValidateEnabledRef
+    faultRecoveryMode: *faultRecoveryModeRef
+    #@Engineering-start
+    faultRecoveryValidate: *faultRecoveryValidateRef
+    nrfDbSchema: "{\"versions\":[{\"version\":\"0\",\"dbList\":[{\"dbName\":\"appDbName\",\"dbTableSchema\":[{\"tableName\":\"NfStatusMonitor\",\"columns\":[{\"column\":\"nfInstanceId\"},{\"column\":\"recordOwner\"},{\"column\":\"nfStatusMonitorJsonDocList\"},{\"column\":\"nfStatus\"},{\"column\":\"suspendedTimestamp\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"lastUpdateFromNFTimestamp\"}]},{\"tableName\":\"NfInstances\",\"columns\":[{\"column\":\"nfInstanceId\"},{\"column\":\"recordOwner\"},{\"column\":\"nfType\"},{\"column\":\"nfStatus\"},{\"column\":\"nfFqdn\"},{\"column\":\"nfProfileJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"lastUpdateFromNFTimestamp\"}]}],\"tableConfiguration\":[{\"tableName\":\"nfStatusMonitor\"}]}]},{\"version\":\"2300100\",\"dbList\":[{\"dbName\":\"appDbName\",\"dbTableSchema\":[{\"tableName\":\"NfStatusMonitor\",\"columns\":[{\"column\":\"nfInstanceId\"},{\"column\":\"recordOwner\"},{\"column\":\"nfStatusMonitorJsonDocList\"},{\"column\":\"nfStatus\"},{\"column\":\"suspendedTimestamp\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"lastUpdateFromNFTimestamp\"}]},{\"tableName\":\"NfInstances\",\"columns\":[{\"column\":\"nfInstanceId\"},{\"column\":\"recordOwner\"},{\"column\":\"nfType\"},{\"column\":\"nfStatus\"},{\"column\":\"nfFqdn\"},{\"column\":\"nfProfileJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"lastUpdateFromNFTimestamp\"}]}],\"tableConfiguration\":[{\"tableName\":\"nfStatusMonitor\"}]}]}]}"
+    #@Engineering-end
+
+  #@Engineering-start
+  # Engineering Configuration:
+  podRestartPolicy: Always
+  #@Engineering-end
+
+  #@Engineering-start
+  # Engineering Configuration:
+
+  reg:
+    # setting max-thread-pool-size
+    maxThreadPoolSize: 25
+    # setting core-thread-pool-size
+    coreThreadPoolSize: 15
+    # setting queue-capacity-size
+    queueCapacitySize: 500
+  # jaeger details
+  jaeger:
+    service:
+      name: "occne-tracer-jaeger-collector.occne-infra"
+      port: 9411
+ 
+  # Thread WatchDog configuration for livenessProbe  
+  watchDog:
+    isThreadWatchDogEnabled: true
+    watchDogMonitoringInterval: 10000
+    watchDogFailureRange: 2,4,6
+    watchDogThreadMaxExecutionTime: 65000
+  #@Engineering-end
+
+  startupProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationStartup
+      port: *nfregistrationCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a startup probe check every xx seconds (until success)
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 5
+
+  readinessProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationReadiness
+      port: *nfregistrationCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells where the curl for status will hit
+    httpGet:
+      path: /actuator/health/applicationLiveness
+      port: *nfregistrationCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 40
+    # Specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 12
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 2
+
+  #@Engineering-start
+  # Engineering Configuration:
+  server:
+    # The maximum number of connections that the server will accept and process at any given time
+    maxConnections: 10000
+    # The maximum queue length for incoming connection requests
+    queueSize: 100
+    # maximum number of simultaneous requests that can be handled
+    maxThreads: 200
+    # The minimum number of threads always kept running
+    spareThreads: 20
+    # waiting time
+    waitTime: 35
+
+  # Engineering Configuration: publishing resource api
+  nfInstancesApi: "nnrf-nfm/v1/nf-instances"
+
+  # Engineering Configuration: The time interval between 2 consecutive system options fetch from DB in Milliseconds
+  systemOptionsFetchInterval: 3000
+  #@Engineering-end
+
+
+  # enable/ disable server compression gzip
+  responseCompressionGzip: true
+
+  service:
+    # Service Type
+    type: ClusterIP
+
+    # Labels and Annotations that are specific to service nfRegistration are added here.
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  # Labels and Annotations that are specific to deployment nfRegistration are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+
+  #@Engineering-start
+  # Engineering Configuration: setting hikari pool size
+  # and Idle Timeout for DB Connections
+  hikariPoolSize: 30
+  hikariConnectionTimeout: 10000
+  # hikariMinimumIdle should be less than maximum pool size
+  hikariMinimumIdle: 10
+  hikariIdleTimeout: 500000
+  hikariMaxLifetime: 540000
+
+  undertow:
+    maxConcurrentStream: 100
+    initialWindowSize: 65535
+    noRequestTimeout: 60
+    ioThreads: 8
+    workerThreads: 64
+    #@Engineering-end
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+#########################################################
+#            Section End  : nfregistration attributes   #
+#########################################################
+
+
+#########################################################
+#            Section Start: nfsubscription attributes   #
+#########################################################
+nfsubscription:
+
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    ephemeralStorageLimit: 1024
+    #@Engineering-start
+    #Upgrade strategy, maxUnavailable pods declared for upgrade process
+    #The only supported upgrade strategy is RollingUpdate
+    upgradeStrategy: "RollingUpdate"
+    overrideReplicationCheck: "false"
+    #@Engineering-end
+
+    # Engineering configuration
+    # Maximum Unavailable nfsubscription pods during pod disruption.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxPdbUnavailable: *maxPdbUnavailableRef
+
+    # Engineering configuration
+    # Maximum Unavailable nfsubscription pods during upgrade.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxUnavailable: *maxUnavailableRef
+
+  #@Engineering-start
+  enabled: true
+  #@Engineering-end
+  image:
+    # image name
+    name: ocnrf-nfsubscription
+    # tag name of image
+    tag: *nrfTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+  # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'
+ 
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  #@Engineering-start
+  # Engineering Configuration:
+  sub:
+    # setting max-thread-pool-size
+    maxThreadPoolSize: 150
+    # setting core-thread-pool-size
+    coreThreadPoolSize: 100
+    # setting queue-capacity-size
+    queueCapacitySize: 65000
+    # setting record-event-max-thread-pool-size
+    recordEventMaxThreadPoolSize: 25
+    # setting record-event-core-thread-pool-size
+    recordEventCoreThreadPoolSize: 15
+    # setting record-event-queue-capacity-size
+    recordEventQueueCapacitySize: 500
+    # setting pod-protection-thread-pool-size
+    podProtectionThreadPoolSize: 2
+    # setting task-scheduler-thread-pool-size
+    taskSchedulerThreadPoolSize: 8
+    svc:
+      notificationMaxRetries: 1
+  #@Engineering-end
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- memory: 1Gi
+      memory: 3Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- memory: 1Gi
+      memory: 3Gi
+    target:
+      averageCpuUtil: 65
+
+  # Min replicas to scale to maintain an average CPU utilization
+  #@min_resources- minReplicas: 1
+  minReplicas: 2
+  # Max replicas to scale to maintain an average CPU utilization
+  maxReplicas: 4
+
+  hookRestartPolicy: Never
+
+  hooks:
+    preValidateEnabled: *preValidateEnabledRef
+    postValidateEnabled: *postValidateEnabledRef
+    faultRecoveryMode: *faultRecoveryModeRef
+    #@Engineering-start
+    faultRecoveryValidate: *faultRecoveryValidateRef
+    nrfDbSchema: "{\"versions\": [{ \"version\": \"0\", \"dbList\": [{ \"dbName\": \"appDbName\", \"dbTableSchema\": [ { \"tableName\": \"NfSubscriptions\", \"columns\": [ { \"column\": \"subscriptionId\" }, {\"column\": \"subscriptionJsonDocList\" }, { \"column\": \"recordOwner\" }, {\"column\": \"subscriptionStatus\"},{ \"column\": \"subscrCondType\" }, { \"column\": \"notificationFqdn\" }, {\"column\": \"reqNfFqdn\"}, {\"column\": \"validityTime\" },  {\"column\": \"lastUpdateTimestamp\" }]}],  \"tableConfiguration\": [ { \"tableName\": \"NrfSystemOptions\" }]}]}, { \"version\": \"2300100\", \"dbList\": [ {  \"dbName\": \"appDbName\", \"dbTableSchema\": [ {\"tableName\": \"NfSubscriptions\", \"columns\": [ { \"column\": \"subscriptionId\"}, { \"column\": \"subscriptionJsonDocList\"}, { \"column\": \"recordOwner\"}, { \"column\": \"subscriptionStatus\"}, { \"column\": \"subscrCondType\"}, { \"column\": \"notificationFqdn\"}, { \"column\": \"reqNfFqdn\"},  { \"column\": \"validityTime\"},  { \"column\": \"lastUpdateTimestamp\"} ]}], \"tableConfiguration\": [ {\"tableName\": \"NrfSystemOptions\"  }] }]}]}"
+    #@Engineering-end
+
+
+  #@Engineering-start
+  # Engineering Configuration:
+  podRestartPolicy: Always
+
+  # Thread WatchDog configuration for livenessProbe  
+  watchDog:
+    isThreadWatchDogEnabled: true
+    watchDogMonitoringInterval: 10000
+    watchDogFailureRange: 2,4,6
+    watchDogThreadMaxExecutionTime: 65000
+  # Flag to disable/enable pod-protection based on memory
+  podProtection:
+    skipMemoryMonitor: true
+  #@Engineering-end
+
+  startupProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationStartup
+      port: *nfsubscriptionCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a startup probe check every xx seconds (until success)
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 5
+
+  readinessProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationReadiness
+      port: *nfsubscriptionCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells where the curl for status will hit
+    httpGet:
+      path: /actuator/health/applicationLiveness
+      port: *nfsubscriptionCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 40
+    # Specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 12
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 2
+
+  #@Engineering-start
+  # Engineering Configuration:
+  server:
+    # The maximum number of connections that the server will accept and process at any given time
+    maxConnections: 10000
+    # The maximum queue length for incoming connection requests
+    queueSize: 100
+    # maximum number of simultaneous requests that can be handled
+    maxThreads: 200
+    # The minimum number of threads always kept running
+    spareThreads: 20
+    # waiting time
+    waitTime: 35
+
+  # Engineering Configuration: The time interval between 2 consecutive system options fetch from DB in Milliseconds
+  systemOptionsFetchInterval: 3000
+  #@Engineering-end
+
+  service:
+    # Service Type
+    type: ClusterIP
+
+    # Labels and Annotations that are specific to service nfSubscription are added here.
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  # Labels and Annotations that are specific to deployment nfSubscription are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  #@Engineering-start
+  # Engineering Configuration: setting hikari pool size
+  # and Idle Timeout for DB Connections
+  hikariPoolSize: 60
+  hikariConnectionTimeout: 10000
+  # hikariMinimumIdle should be less than maximum pool size
+  hikariMinimumIdle: 10
+  hikariIdleTimeout: 500000
+  hikariMaxLifetime: 540000
+
+  undertow:
+    maxConcurrentStream: 100
+    initialWindowSize: 65535
+    noRequestTimeout: 60
+    ioThreads: 8
+    workerThreads: 64
+  #@Engineering-end
+
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+#########################################################
+#            Section End  : nfsubscription attributes   #
+#########################################################
+
+
+#########################################################
+#            Section Start: nrfauditor attributes       #
+#########################################################
+nrfauditor:
+
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    ephemeralStorageLimit: 1024
+    #@Engineering-start
+    #Upgrade strategy, maxUnavailable pods declared for upgrade process
+    #The only supported upgrade strategy is RollingUpdate
+    upgradeStrategy: "RollingUpdate"
+    overrideReplicationCheck: "false"
+    #@Engineering-end
+
+    # Engineering configuration
+    # Maximum Unavailable nrfauditor pods during pod disruption.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxPdbUnavailable: *maxPdbUnavailableRef
+
+    # Engineering configuration
+    # Maximum Unavailable nrfauditor pods during upgrade.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxUnavailable: *maxUnavailableRef
+
+  #@Engineering-start
+  enabled: true
+  #@Engineering-end
+  image:
+    # image name
+    name: ocnrf-nrfauditor
+    # tag name of image
+    tag: *nrfTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+   # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  hookRestartPolicy: Never
+
+  hooks:
+    preValidateEnabled: *preValidateEnabledRef
+    postValidateEnabled: *postValidateEnabledRef
+    faultRecoveryMode: *faultRecoveryModeRef
+    #@Engineering-start
+    faultRecoveryValidate: *faultRecoveryValidateRef
+    nrfDbSchema: "{\"versions\":[{\"version\":\"0\",\"dbList\":[{\"dbName\":\"leaderElectionDbName\",\"dbTableSchema\":[{\"tableName\":\"NrfAuditorLeaderPod\",\"columns\":[{\"column\":\"leaderIp\"},{\"column\":\"leaderSince\"},{\"column\":\"hbTimestamp\"}]}],\"tableConfiguration\":[{\"tableName\":\"NrfAuditorLeaderPod\"}]}]},{\"version\":\"2300100\",\"dbList\":[{\"dbName\":\"leaderElectionDbName\",\"dbTableSchema\":[{\"tableName\":\"NrfAuditorLeaderPod\",\"columns\":[{\"column\":\"leaderIp\"},{\"column\":\"leaderSince\"},{\"column\":\"hbTimestamp\"}]}],\"tableConfiguration\":[{\"tableName\":\"NrfAuditorLeaderPod\"}]}]}]}"
+    #@Engineering-end
+
+
+  #@Engineering-start
+  # Engineering Configuration:
+  podRestartPolicy: Always
+  # Multi Pod Support configuration
+  multipodsupportenabled: true
+  leaderelectiontablename: NrfAuditorLeaderPod
+  multipodsupporthbtimestamplimttobeleader: 5000
+  multipodsupporthbtimestamplimttoremoveleader: 8000
+  multipodsupporthbupdateinterval: 1000
+  #@Engineering-end
+
+  #@Engineering-start
+  # Engineering Configuration:
+
+  # Engineering Configuration:
+  audit:
+    # setting subscription-audit-interval
+    subInt: "10s"
+    # setting heartbeat-audit-interval
+    hbInt: "5s"
+    # setting remote-heartbeat-audit-interval
+    hbRemoteInt: "15s"
+    # setting nf-profile-audit-interval
+    nfInt: "10s"
+    # setting audit wait-time
+    waitTime: 35
+    # subscription remote audit interval
+    subRemoteInt: "75m"
+    # setting nrf-event audit interval
+    nrfEventInt: "60m"
+
+    # setting max-thread-pool-size
+    maxThreadPoolSize: 25
+    # setting core-thread-pool-size
+    coreThreadPoolSize: 15
+    # setting queue-capacity-size
+    queueCapacitySize: 500
+
+  # Thread WatchDog configuration for livenessProbe  
+  watchDog:
+    isThreadWatchDogEnabled: true
+    watchDogMonitoringInterval: 10000
+    watchDogFailureRange: 2,4,6
+    watchDogThreadMaxExecutionTime: 65000
+
+  # The time interval between 2 consecutive controlled shutdown operational state fetch from DB in Milliseconds
+  # It should match with common config poll interval
+  operationalStatePollInterval: 5000
+  #@Engineering-end
+
+  startupProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationStartup
+      port: *nrfauditorCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a startup probe check every xx seconds (until success)
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 5
+
+  readinessProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationReadiness
+      port: *nrfauditorCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells where the curl for status will hit
+    httpGet:
+      path: /actuator/health/applicationLiveness
+      port: *nrfauditorCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 40
+    # Specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 12
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 2
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 6
+      #@min_resources- memory: 1Gi
+      memory: 3Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 6
+      #@min_resources- memory: 1Gi
+      memory: 3Gi
+
+  # Min replicas to scale to maintain an average CPU utilization
+  #@min_resources- minReplicas: 1
+  minReplicas: 2
+  # Max replicas to scale to maintain an average CPU utilization
+  maxReplicas: 2
+
+  service:
+    # Service Type
+    type: ClusterIP
+
+    # Labels and Annotations that are specific to service nrfAuditor are added here.
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  #Labels and Annotations that are specific to deployment nrfAuditor are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+
+  #@Engineering-start
+  # Engineering Configuration: setting hikari pool size
+  # and Idle Timeout for DB Connections
+  hikariPoolSize: 30
+  hikariConnectionTimeout: 10000
+  # hikariMinimumIdle should be less than maximum pool size
+  hikariMinimumIdle: 10
+  hikariIdleTimeout: 500000
+  hikariMaxLifetime: 540000
+  
+  # Engineering Configuretion: Auditor pod downtime threshold 
+  # to pause audit processes.  
+  auditorDowntimeThreshold: "5s"
+  #@Engineering-end
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+#########################################################
+#            Section End  : nrfauditor attributes       #
+#########################################################
+
+
+#########################################################
+#            Section Start: nfdiscovery attributes      #
+#########################################################
+nfdiscovery:
+
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    ephemeralStorageLimit: 2048
+    overrideReplicationCheck: "false"
+    #@Engineering-start
+    #Upgrade strategy, maxUnavailable pods declared for upgrade process
+    #The only supported upgrade strategy is RollingUpdate
+    upgradeStrategy: "RollingUpdate"
+    #@Engineering-end
+
+    # Engineering configuration
+    # Maximum Unavailable nfdiscovery pods during pod disruption.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxPdbUnavailable: *maxPdbUnavailableRef
+
+    # Engineering configuration
+    # Maximum Unavailable nfdiscovery pods during upgrade.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxUnavailable: *maxUnavailableRef
+
+  #@Engineering-start
+  enabled: true
+  #@Engineering-end
+  image:
+    # image name
+    name: ocnrf-nfdiscovery
+    # tag name of image
+    tag: *nrfTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+
+  # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 4
+      #@min_resources- memory: 2Gi
+      memory: 3Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 4
+      #@min_resources- memory: 1Gi
+      memory: 3Gi
+    target:
+      averageCpuUtil: 65
+
+  # Min replicas to scale to maintain an average CPU utilization
+  #@min_resources- minReplicas: 1
+  minReplicas: 2
+  # Max replicas to scale to maintain an average CPU utilization
+  maxReplicas: 44
+
+  hookRestartPolicy: Never
+  #@Engineering-start
+  # Engineering Configuration:
+  podRestartPolicy: Always
+
+  # Thread WatchDog configuration for livenessProbe  
+  watchDog:
+    isThreadWatchDogEnabled: true
+    watchDogMonitoringInterval: 10000
+    watchDogFailureRange: 2,4,6
+    watchDogThreadMaxExecutionTime: 65000
+
+  #@Engineering-end
+
+  # Set of search query parameters to ignore
+  # multiple attributes can be added in comma separated way, example: requester-nf-instance-id,client-type,an-node-type
+  searchQueryIgnoreList: requester-nf-instance-id
+
+  startupProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationStartup
+      port: *nfdiscoveryCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a startup probe check every xx seconds (until success)
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 5
+
+  readinessProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationReadiness
+      port: *nfdiscoveryCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells where the curl for status will hit
+    httpGet:
+      path: /actuator/health/applicationLiveness
+      port: *nfdiscoveryCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 40
+    # Specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 12
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 2
+
+  #@Engineering-start
+  # Engineering Configuration:
+  disc:
+    # setting max-thread-pool-size
+    maxThreadPoolSize: 15
+    # setting cache-thread-pool-size
+    cacheThreadPoolSize: 25
+    # setting cache-max-allowed-workers
+    cacheMaxAllowedWorkers: 17
+    # setting cache-nf-types-perWorker
+    cacheNfTypesPerWorker: 2
+
+  server:
+    # The maximum number of connections that the server will accept and process at any given time
+    maxConnections: 10000
+    # The maximum queue length for incoming connection requests
+    queueSize: 100
+    # maximum number of simultaneous requests that can be handled
+    maxThreads: 200
+    # The minimum number of threads always kept running
+    spareThreads: 20
+    # waiting time
+    waitTime: 35
+
+  # Engineering Configuration: The time interval between 2 consecutive system options fetch from DB in Milliseconds
+  systemOptionsFetchInterval: 3000
+
+  #@Engineering-end
+
+  service:
+    # Service Type
+    type: ClusterIP
+
+    # Labels and Annotations that are specific to service nfDiscovery are added here.
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  #Labels and Annotations that are specific to deployment nfDiscovery are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  #@Engineering-start
+  # Engineering Configuration: setting hikari pool size
+  # and Idle Timeout for DB Connections
+  hikariPoolSize: 30
+  hikariConnectionTimeout: 10000
+  # hikariMinimumIdle should be less than maximum pool size
+  hikariMinimumIdle: 10
+  hikariIdleTimeout: 500000
+  hikariMaxLifetime: 540000
+
+  undertow:
+    maxConcurrentStream: 100
+    initialWindowSize: 65535
+    noRequestTimeout: 60
+    ioThreads: 8
+    workerThreads: 64
+  
+  # Flag to enable/ disable the caching feature
+  discoveryCache:
+    enabled: true
+   
+  # Engineering Configuration: The time interval for server graceful shutdown of reactive netty server
+  serverShutdownInterval: 30s
+  
+  #@Engineering-end
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+#########################################################
+#            Section End  : nfdiscovery attributes      #
+#########################################################
+
+#########################################################
+#            Section Start: nfaccesstoken attributes    #
+#########################################################
+# Details of NF Access Token Microservice
+nfaccesstoken:
+
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    ephemeralStorageLimit: 1024
+    overrideReplicationCheck: "false"
+    #@Engineering-start
+    #Upgrade strategy, maxUnavailable pods declared for upgrade process
+    #The only supported upgrade strategy is RollingUpdate
+    upgradeStrategy: "RollingUpdate"
+    #@Engineering-end
+
+    # Engineering configuration
+    # Maximum Unavailable nfaccesstoken pods during pod disruption.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxPdbUnavailable: *maxPdbUnavailableRef
+
+    # Engineering configuration
+    # Maximum Unavailable nfaccesstoken pods during upgrade.
+    # By default the global configured value will be used. 
+    # The reference variable needs to be replaced with absolute 
+    # value, in case per micro-service value needs to be changed.
+    maxUnavailable: *maxUnavailableRef
+
+  # Flag to disable Oauth micro-service
+  enabled: true
+  # Image Details
+  image:
+    name: ocnrf-nfaccesstoken
+    tag: *nrfTagRef
+    pullPolicy: *imagePullPolicyRef
+
+   # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  # Access token key certificate infrastructure details
+  oauth:
+    # Issuer OCNRF's NF Instance ID is a Mandatory parameter if
+    # Access Token Service is deployed (i.e. nfaccesstoken.enabled= true)
+    #
+    # This is NRF Instance ID that will be used for signing AccessTokenClaim (iss IE of AccessTokenClaim).
+    #
+    # If NRF needs to issue AccessTokenClaim using it's own NF instance ID then
+    # the nrfInstanceId configured in the global section (global.nrfInstanceId) needs to configured here again.
+    #
+    # If NRF needs to issue AccessTokenClaim using a common/virtual then
+    # a common/virtual NF instance ID needs to be configured here (along with the
+    # common/virtual PrivateKey and Certificate Pair). The same NF instance id
+    # and PrivateKey and Certificate Pair needs to be configured in all other NRFs
+    # as well so that tokens issues by all the NRF can be validated using a Single
+    # NfIstanceId and KeyPair.
+    nrfInstanceId: *nrfInstanceIdRef
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- memory: 1Gi
+      memory: 2Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- memory: 1Gi
+      memory: 2Gi
+    target:
+      averageCpuUtil: 65
+
+  hookRestartPolicy: Never
+  #@Engineering-start
+  # Engineering Configuration:
+  podRestartPolicy: Always
+
+  # Thread WatchDog configuration for livenessProbe  
+  watchDog:
+    isThreadWatchDogEnabled: true
+    watchDogMonitoringInterval: 10000
+    watchDogFailureRange: 2,4,6
+    watchDogThreadMaxExecutionTime: 65000
+  #@Engineering-end
+
+  startupProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationStartup
+      port: *nfaccesstokenCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a startup probe check every xx seconds (until success)
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 5
+
+  readinessProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationReadiness
+      port: *nfaccesstokenCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells where the curl for status will hit
+    httpGet:
+      path: /actuator/health/applicationLiveness
+      port: *nfaccesstokenCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 40
+    # Specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 12
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 2
+
+  #@Engineering-start
+  # Engineering Configuration:
+  server:
+    waitTime: 35
+
+  #@Engineering-end
+
+  # Min replicas to scale to maintain an average CPU utilization
+  #@min_resources- minReplicas: 1
+  minReplicas: 2
+  # Max replicas to scale to maintain an average CPU utilization
+  maxReplicas: 2
+
+  service:
+    # Service Type
+    type: ClusterIP
+
+    #Labels and Annotations that are specific to service nfAccesstoken are added here.
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  #Labels and Annotations that are specific to deployment nfAccesstoken are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  #@Engineering-start
+  # Engineering Configuration: The time interval between 2 consecutive system options fetch from DB in Milliseconds
+  systemOptionsFetchInterval: 3000
+  #@Engineering-end
+
+  #@Engineering-start
+  # Engineering Configuration: setting hikari pool size
+  # and Idle Timeout for DB Connections
+  hikariPoolSize: 30
+  hikariConnectionTimeout: 10000
+  # hikariMinimumIdle should be less than maximum pool size
+  hikariMinimumIdle: 10
+  hikariIdleTimeout: 500000
+  hikariMaxLifetime: 540000
+
+  undertow:
+    maxConcurrentStream: 100
+    initialWindowSize: 65535
+    noRequestTimeout: 60
+    ioThreads: 8
+    workerThreads: 64
+  #@Engineering-end
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+#########################################################
+#            Section End  : nfaccesstoken attributes    #
+#########################################################
+
+#########################################################
+#            Section Start: nrfconfiguration attributes #
+#########################################################
+nrfconfiguration:
+
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    ephemeralStorageLimit: 1024
+    #@Engineering-start
+    #Upgrade strategy, maxUnavailable pods declared for upgrade process
+    #The only supported upgrade strategy is RollingUpdate
+    upgradeStrategy: "RollingUpdate"
+    maxSurge: 2
+    overrideReplicationCheck: "false"
+    #@Engineering-end
+
+    # Engineering configuration
+    # Maximum Unavailable nrfconfiguration pods during upgrade.
+    # as nrfconfiguration is a single pod service, maxUnavailable
+    # is set to 0 ensure service continuity during upgrade.
+    maxUnavailable: "0"
+
+  #@Engineering-start
+  enabled: true
+  #@Engineering-end
+  image:
+    # image name
+    name: ocnrf-nrfconfiguration
+    # tag name of image
+    tag: *nrfTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+   # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  oauth:
+    nrfInstanceId: *nrfInstanceIdRef
+
+  service:
+    # If Static load balancer IP needs to be set, then set staticIpAddressEnabled flag to true and provide value for staticIpAddress
+    # Else random IP will be assigned by the External LoadBalancer from its IP Pool
+    staticIpAddressEnabled: false
+    staticIpAddress: 10.75.212.50
+
+    # If Static node port needs to be set, then set staticNodePortEnabled flag to true and provide value for staticNodePort
+    # Else random node port will be assigned by K8
+    staticNodePortEnabled: false
+    staticNodePort: 30076
+
+    # Service Type
+    type: LoadBalancer
+
+    #Labels and Annotations that are specific to service nrfConfiguration are added here.
+    customExtension:
+      labels: {}
+      annotations:
+        oracle.com.cnc/app-protocols: '{"http2-oam":"HTTP2"}'
+
+  #Labels and Annotations that are specific to deployment nrfConfiguration are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- memory: 1Gi
+      memory: 2Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- memory: 1Gi
+      memory: 2Gi
+    target:
+      averageCpuUtil: 80
+
+
+  hookRestartPolicy: Never
+
+  hooks:
+    preValidateEnabled: *preValidateEnabledRef
+    postValidateEnabled: *postValidateEnabledRef
+    faultRecoveryMode: *faultRecoveryModeRef
+    #@Engineering-start
+    faultRecoveryValidate: *faultRecoveryValidateRef
+    nrfDbSchema: "{\"versions\":[{\"version\":\"0\",\"dbList\":[{\"dbName\":\"appDbName\",\"dbTableSchema\":[{\"tableName\":\"NfScreening\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nfScreeningRulesListType\"},{\"column\":\"nfScreeningType\"},{\"column\":\"nfScreeningRulesListStatus\"},{\"column\":\"nfScreeningJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"}]},{\"tableName\":\"NrfEventTransactions\",\"columns\":[{\"column\":\"recordCreator\"},{\"column\":\"creationTimestamp\"},{\"column\":\"eventDetails\"}]},{\"tableName\":\"NrfSystemOptions\",\"columns\":[{\"column\":\"configType\"},{\"column\":\"recordOwner\"},{\"column\":\"configurationJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"}]},{\"tableName\":\"SiteIdToNrfInstanceIdMapping\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nrfInstanceId\"},{\"column\":\"siteId\"}]}]},{\"dbName\":\"networkScopedDbName\",\"dbTableSchema\":[{\"tableName\":\"NfScreening_backup\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nfScreeningRulesListType\"},{\"column\":\"nfScreeningType\"},{\"column\":\"nfScreeningRulesListStatus\"},{\"column\":\"nfScreeningJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"releaseVersion\"}]},{\"tableName\":\"NrfSystemOptions_backup\",\"columns\":[{\"column\":\"configType\"},{\"column\":\"recordOwner\"},{\"column\":\"configurationJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"releaseVersion\"}]},{\"tableName\":\"SiteIdToNrfInstanceIdMapping_backup\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nrfInstanceId\"},{\"column\":\"siteId\"},{\"column\":\"releaseVersion\"}]}],\"tableConfiguration\":[{\"tableName\":\"NrfSystemOptions\"}]}]},{\"version\":\"2300100\",\"dbList\":[{\"dbName\":\"appDbName\",\"dbTableSchema\":[{\"tableName\":\"NfScreening\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nfScreeningRulesListType\"},{\"column\":\"nfScreeningType\"},{\"column\":\"nfScreeningRulesListStatus\"},{\"column\":\"nfScreeningJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"}]},{\"tableName\":\"NrfEventTransactions\",\"columns\":[{\"column\":\"recordCreator\"},{\"column\":\"creationTimestamp\"},{\"column\":\"eventDetails\"}]},{\"tableName\":\"NrfSystemOptions\",\"columns\":[{\"column\":\"configType\"},{\"column\":\"recordOwner\"},{\"column\":\"configurationJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"}]},{\"tableName\":\"SiteIdToNrfInstanceIdMapping\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nrfInstanceId\"},{\"column\":\"siteId\"}]}]},{\"dbName\":\"networkScopedDbName\",\"dbTableSchema\":[{\"tableName\":\"NfScreening_backup\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nfScreeningRulesListType\"},{\"column\":\"nfScreeningType\"},{\"column\":\"nfScreeningRulesListStatus\"},{\"column\":\"nfScreeningJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"releaseVersion\"}]},{\"tableName\":\"NrfSystemOptions_backup\",\"columns\":[{\"column\":\"configType\"},{\"column\":\"recordOwner\"},{\"column\":\"configurationJsonDocList\"},{\"column\":\"lastUpdateTimestamp\"},{\"column\":\"releaseVersion\"}]},{\"tableName\":\"SiteIdToNrfInstanceIdMapping_backup\",\"columns\":[{\"column\":\"recordOwner\"},{\"column\":\"nrfInstanceId\"},{\"column\":\"siteId\"},{\"column\":\"releaseVersion\"}]}],\"tableConfiguration\":[{\"tableName\":\"NrfSystemOptions\"}]}]}]}"
+    #@Engineering-end
+
+  #@Engineering-start
+  # Engineering Configuration:
+  podRestartPolicy: Always
+
+  # Thread WatchDog configuration for livenessProbe  
+  watchDog:
+    isThreadWatchDogEnabled: true
+    watchDogMonitoringInterval: 10000
+    watchDogFailureRange: 2,4,6
+    watchDogThreadMaxExecutionTime: 65000
+  # Flag to disable/enable pod-protection based on memory
+  podProtection:
+    skipMemoryMonitor: true
+  #@Engineering-end
+
+  startupProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationStartup
+      port: *nrfconfigurationCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a startup probe check every xx seconds (until success)
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 5
+
+  readinessProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationReadiness
+      port: *nrfconfigurationCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 10
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells where the curl for status will hit
+    httpGet:
+      path: /actuator/health/applicationLiveness
+      port: *nrfconfigurationCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 40
+    # Specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 12
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 2
+
+  #@Engineering-start
+  # Engineering Configuration:
+  server:
+    # The maximum number of connections that the server will accept and process at any given time
+    maxConnections: 10000
+    # The maximum queue length for incoming connection requests
+    queueSize: 100
+    # maximum number of simultaneous requests that can be handled
+    maxThreads: 200
+    # The minimum number of threads always kept running
+    spareThreads: 20
+
+  # The maximum value for global subscription limit
+  maxGlobalSubscriptionLimit: 1000
+  #@Engineering-end
+
+  #@Engineering-start
+  # Engineering Configuration:: setting hikari pool size
+  # and Idle Timeout for DB Connections
+  hikariPoolSize: 10
+  hikariConnectionTimeout: 10000
+  # hikariMinimumIdle should be less than maximum pool size
+  hikariMinimumIdle: 5
+  hikariIdleTimeout: 500000
+  hikariMaxLifetime: 540000
+  #@Engineering-end
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+#########################################################
+#            Section End  : nrfconfiguration attributes #
+#########################################################
+
+#########################################################
+#            Section Start: nrfartisan attributes   #
+#########################################################
+# NRF microservices
+nrfartisan:
+  
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    ephemeralStorageLimit: 1024
+    overrideReplicationCheck: "false"
+    #@Engineering-start
+    # Engineering Configuration
+    #Upgrade strategy, maxUnavailable pods declared for upgrade process
+    #The only supported upgrade strategy is RollingUpdate
+    upgradeStrategy: "RollingUpdate"
+    maxSurge: 2
+    #@Engineering-end
+
+    # Engineering configuration
+    # Maximum Unavailable nrfartisan pods during upgrade.
+    # as nrfartisan is a single pod service, maxUnavailable
+    # is set to 0 ensure service continuity during upgrade.
+    maxUnavailable: "0"
+
+  image:
+    # image name
+    name: ocnrf-nrfartisan
+    # tag name of image
+    tag: *nrfTagRef
+    # Pull Policy - Possible Values are:- Always, IfNotPresent, Never
+    pullPolicy: *imagePullPolicyRef
+
+   # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 4
+      #@min_resources- memory: 1Gi
+      memory: 2Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 4
+      #@min_resources- memory: 1Gi
+      memory: 2Gi
+    target:
+      averageCpuUtil: 80
+
+  # Min replicas to scale to maintain an average CPU utilization
+  #@min_resources- minReplicas: 1
+  minReplicas: 1
+  # Max replicas to scale to maintain an average CPU utilization
+  maxReplicas: 1
+
+  hookRestartPolicy: Never
+  #@Engineering-start
+  # Engineering Configuration:
+  podRestartPolicy: Always
+  #@Engineering-end
+
+  #@Engineering-start
+  # Engineering Configuration:
+
+  # jaeger details
+  jaeger:
+    service:
+      name: "occne-tracer-jaeger-collector.occne-infra"
+      port: 9411
+
+  # Thread WatchDog configuration for livenessProbe  
+  watchDog:
+    isThreadWatchDogEnabled: true
+    watchDogMonitoringInterval: 10000
+    watchDogFailureRange: 2,4,6
+    watchDogThreadMaxExecutionTime: 65000 
+  #@Engineering-end
+
+  startupProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationStartup
+      port: *nrfartisanCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a startup probe check every xx seconds (until success)
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 5
+
+  readinessProbe:
+    # Tells where the curl for the status of probe will hit
+    httpGet:
+      path: /actuator/health/applicationReadiness
+      port: *nrfartisanCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 20
+    # Specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells where the curl for status will hit
+    httpGet:
+      path: /actuator/health/applicationLiveness
+      port: *nrfartisanCommonServicePortRef
+    # Instructs kubelet to wait xx second before performing the first probe check
+    initialDelaySeconds: 40
+    # Specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 12
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # Specifies the number of times Kubernetes will try before giving up
+    failureThreshold: 2
+
+  #@Engineering-start
+  # Engineering Configuration:
+  server:
+    # The maximum number of connections that the server will accept and process at any given time
+    maxConnections: 10000
+    # The maximum queue length for incoming connection requests
+    queueSize: 100
+    # maximum number of simultaneous requests that can be handled
+    maxThreads: 200
+    # The minimum number of threads always kept running
+    spareThreads: 20
+    # waiting time
+    waitTime: 35
+
+
+  # Engineering Configuration: The time interval between 2 consecutive system options fetch from DB in Milliseconds
+  systemOptionsFetchInterval: 3000
+
+  # Engineering Configuration: The time interval between 2 consecutive re-population of slfDiscoveredCandidateList in Milliseconds
+  slfDiscoveredCandidateListFetchInterval: 10000
+
+  # Engineering Configuration: The time interval between 2 consecutive re-fetching of dnsNaptrFeatureStatus in Milliseconds
+  dnsNaptrFeatureStatusFetchInterval: 10000
+
+  # enable/ disable server compression gzip
+  responseCompressionGzip: true
+  #@Engineering-end
+
+
+  service:
+    # Service Type
+    type: ClusterIP
+
+    # Labels and Annotations that are specific to service nrfArtisan are added here.
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  # Labels and Annotations that are specific to deployment nrfArtisan are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+
+  #@Engineering-start
+  # Engineering Configuration: setting hikari pool size
+  # and Idle Timeout for DB Connections
+  hikariPoolSize: 30
+  hikariConnectionTimeout: 10000
+  # hikariMinimumIdle should be less than maximum pool size
+  hikariMinimumIdle: 10
+  hikariIdleTimeout: 500000
+  hikariMaxLifetime: 540000
+
+    #@Engineering-end
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+#########################################################
+#            Section End  : nrfartisan attributes   #
+#########################################################
+
+
+
+
+#########################################################
+#            Section Start  : appinfo attributes    #
+#########################################################
+appinfo:
+
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+
+    # imagePullPolicy - Possible Values are:- Always, IfNotPresent, Never
+    imagePullPolicy: *imagePullPolicyRef
+
+  #@Engineering-start
+  # Flag to app info service
+  enabled: true
+  #@Engineering-end
+  # Image Details
+  image: oc-app-info
+  imageTag: *appInfoTagRef
+
+
+  # Node Selector Status (ENABLED/DISABLED)
+  ##Note: "USE_GLOBAL_VALUE" is not supported for appinfo. When nodeSelection is ENABLED, below nodeSelector attribute value is used.  
+  nodeSelection: "DISABLED"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+  
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector: {}
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  'samplenodeselectorkey' : 'samplenodeselectorvalue'
+  
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  #@Engineering-start
+  # Engineering Configuration:
+
+  #Config client configuration
+  commonCfgClient:
+    enabled: true
+  commonCfgServer:
+    configServerSvcName: nrfconfiguration
+    port: *configurationServicePortRef
+    pollingInterval: 5000
+    connectionTimeout: 10000
+  commonServiceName: *appinfoCommonSvcNameRef
+  #@Engineering-end
+
+  # Db Hook Image details
+  dbHookImage:
+    name: common_config_hook
+    tag: *gwTagRef
+    pullPolicy: *imagePullPolicyRef
+
+  # Db Hook Configuration
+  # Engineering configuration to select database (read only)
+  dbConfig:
+    dbHost: *mySqlHostRef
+    dbPort: *mySqlPortRef
+    secretName: *privilegedSecretNameRef
+    dbName: *dbNameRef
+    dbEngine: *databaseEngineRef
+    #@Engineering-start
+    # Engineering Configuration:
+    # Name of the Key configured for "DB Username" in Secret with following name: "<dbConfig.secretName>"
+    dbUNameLiteral: *dbUserRef
+    # Name of the Key configured for "DB Password" in Secret with following name: "<dbConfig.secretName>"
+    dbPwdLiteral: *dbPwdRef
+  #@Engineering-end
+
+  startupProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 20
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 10
+
+  readinessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 10
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 10
+
+  livenessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 20
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 10
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 200m
+      cpu: 1
+      #@min_resources- memory: 1Gi
+      memory: 1Gi
+      ephemeralStorage: 1024Mi
+    requests:
+      #@min_resources- cpu: 200m
+      cpu: 1
+      #@min_resources- memory: 1Gi
+      memory: 1Gi
+
+  service:
+    type: ClusterIP
+
+    #Labels and Annotations that are specific to service appinfo are added here.
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  #Labels and Annotations that are specific to deployment appinfo are added here.
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  #@min_resources- replicas: 1
+  replicas: 2
+  #@min_resources- minReplicas: 1
+  minReplicas: 2
+  maxReplicas: 2
+
+  # Engineering configuration
+  # Maximum Unavailable perf-info pods during pod disruption/Upgrade.
+  #
+  # Note: Unlike other NRF micro-services, for appinfo there is
+  # a single attribute to configure both PDB/Upgrade maxUnavailable
+  # percentage
+  maxUnavailable: "50%"
+  # The attribute indicates to monitor the database status
+  watchMySQL: false
+  #Replication uri used by the appinfo service to retrieve the replication channel status from the database monitor service
+  replicationUri: "http://mysql-cluster-db-monitor-svc.ocnrf:8080/db-tier/status/replication/realtime"
+  #dbStatusUri is used by the appinfo service to retrieve the database status. This is for future usage.
+  dbStatusUri: "http://mysql-cluster-db-monitor-svc.occne-infra:8080/db-tier/status/local"
+  #realtimeDbStatusUri is used by the appinfo service to retrieve the realtime database status. This is for future usage.
+  realtimeDbStatusUri: "http://mysql-cluster-db-monitor-svc.occne-infra:8080/db-tier/status/cluster/local/realtime"
+  #@Engineering-start
+  debug: false
+  # Flag to enable replication status check
+  replicationStatusCheck: false
+  infraServices: []
+  core_services: []
+  fullnameOverride: ''
+  #@Engineering-end
+
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+
+  #########################################################
+  #            Section End  : appinfo attributes    #
+  #########################################################
+
+  #########################################################
+  #            Section Start  : alternate-route attributes    #
+  #########################################################
+
+  # Default values for alternate-route.
+  # This is a YAML-formatted file.
+  # Declare variables to be passed into your templates.
+
+alternate-route:
+  
+  global:
+    #For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+
+    ## Engineering configuration for Config Client (read only)
+    appinfoServiceEnable: true
+
+
+  # Use 'extraContainers' attribute to control the usage of extra container(DEBUG tool).
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  # If assigned with ENABLED or USE_GLOBAL_VALUE, then ensure "extraContainersTpl" Yaml chunk is defined
+  # at Service level or Global level in the parent chart based on the value assigned respectivley.
+  extraContainers: USE_GLOBAL_VALUE
+
+  deploymentDnsSrv:
+    image: alternate_route
+    tag: *gwTagRef
+    pullPolicy: *imagePullPolicyRef
+
+  # Specify type of service - Possible values are :- ClusterIP, NodePort, LoadBalancer and ExternalName
+  service:
+    type: ClusterIP
+
+  dbHookImage:
+    name: common_config_hook
+    tag: *gwTagRef
+    pullPolicy: *imagePullPolicyRef
+
+  # Node Selector Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  nodeSelection: "USE_GLOBAL_VALUE"
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelector:
+    nodeKey: ''
+    nodeValue: ''
+
+  #Example for nodeSelector attribute:
+  #nodeSelector:
+  #  nodeKey: 'samplenodeselectorkey'
+  #  nodeValue: 'samplenodeselectorvalue'
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  # Number of Pods must always be available, even during a disruption.
+  #@min_resources- minAvailable: 1
+  minAvailable: 2
+  # Min replicas to scale to maintain an average CPU utilization
+  #@min_resources- minReplicas: 1
+  minReplicas: 2
+  # Max replicas to scale to maintain an average CPU utilization
+  maxReplicas: 2
+
+  startupProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 30
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a readiness probe every xx seconds
+    periodSeconds: 10
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 6
+
+  readinessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 30
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 10
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 3
+
+  livenessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 30
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 3
+
+  # Resource details
+  resources:
+    limits:
+      #@min_resources- cpu: 1
+      cpu: 2
+      #@min_resources- commonHooksCpu: 1
+      commonHooksCpu: 1
+      #@min_resources- memory: 1Gi
+      memory: 4Gi
+      #@min_resources- commonHooksMemory: 1Gi
+      commonHooksMemory: 1Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 1
+      #@min_resources- commonHooksCpu: 1
+      commonHooksCpu: 1
+      #@min_resources- memory: 1Gi
+      memory: 2Gi
+      #@min_resources- commonHooksMemory: 1Gi
+      commonHooksMemory: 1Gi
+    target:
+      averageCpuUtil: 65
+
+  #@Engineering-start
+  # Engineering configuration for Config Client (read only)
+  # Engineering Configuration:
+  # Config client configuration 
+  commonCfgClient:
+    enabled: true
+  commonCfgServer:
+    # If below parameter is present then it will be used for integrating with config-server.
+    # This parameter will be appended with the current release name when deployed with alternate-route
+    # In case host name is expected, then leave this parameter blank
+    configServerSvcName: nrfconfiguration
+    port: *configurationServicePortRef
+    pollingInterval: 5000 #(in ms)
+    connectionTimeout: 10000 #(in ms)
+  commonServiceName: *altRouteCommonSvcNameRef
+  #@Engineering-end
+
+  # Engineering configuration
+  # Maximum Unavailable alternate-route pods during pod disruption.
+  # By default the global configured value will be used. 
+  # The reference variable needs to be replaced with absolute 
+  # value, in case per micro-service value needs to be changed.
+  maxUnavailable: *maxPdbUnavailableRef
+   
+  #@Engineering-start
+  upstreamDNSConfigMode: REST  
+  upstreamDnsConfig:
+    enabled: false
+    watchSecretTimeout:             # this configuration is for watch event timeout(in second) it should be always 2000 or 3000 ms less than the                        fixedTsigKeyMonitorDelay
+    fixedTsigKeyMonitorDelay:       # this configuration is for monitoring interval to secret added/updated 
+    tsigKeyNamespace:               # this configuration is for secret created in which namespace
+    tsigKeySecretName:              # this configuration is a secret name
+    host:                           # this configuration is host ip of a upstream dns server
+    port:                           # this configuration is port of a upstream dns server
+    zone:                           # this configuration is zone of a upstream dns server
+    upstreamDNSTimeout:             # this configuration is set timeout for a upstream dns server
+      
+
+  #@Engineering-end
+
+  # Engineering configuration to select database (read only)
+  dbConfig:
+    dbHost: *mySqlHostRef
+    dbPort: *mySqlPortRef
+    secretName: *privilegedSecretNameRef
+    dbName: *dbNameRef
+    dbEngine: *databaseEngineRef
+    
+    #@Engineering-start
+    # Engineering Configuration:
+    # Name of the Key configured for "DB Username" in Secret with following name: "<dbConfig.secretName>"
+    dbUNameLiteral: dbUsername
+    # Name of the Key configured for "DB Password" in Secret with following name: "<dbConfig.secretName>"
+    dbPwdLiteral: dbPassword
+    #@Engineering-end
+    
+  #Static virtual FQDN Config
+  staticVirtualFqdns:
+    - name: http://abc.test.com
+      alternateFqdns:
+      - target: abc.test.com
+        port: 5060
+        priority: 10
+      - target: xyz.test.com
+        port: 5060
+        priority: 2
+
+  dnsSrvEnabled: true
+  dnsSrvFqdnSetting:
+    enabled : false
+    pattern : "_{scheme}._tcp.{fqdn}."
+#########################################################
+#            Section End  : alternate-route attributes    #
+#########################################################
+  
+#########################################################
+#            Section Start  : perf-info attributes      #
+#########################################################
+perf-info:
+
+  global:
+    #  For Ephemeral Storage (Values specified are in MB)
+    logStorage: 70
+    crictlStorage: 1
+    envJaegerQueryUrl:
+    
+    # imagePullPolicy - Possible Values are:- Always, IfNotPresent, Never
+    imagePullPolicy: *imagePullPolicyRef
+
+  # Image Details
+  image: oc-perf-info
+  imageTag: *perfInfoTagRef
+
+  # Node Selector Status (true/false)
+  ##Note: "USE_GLOBAL_VALUE" is not supported for perfinfo. When nodeSelectorEnabled is true, below nodeSelectorKey and nodeSelectorValue attribute values are used.
+  nodeSelectorEnabled: false
+
+  # API version v1 is currently supported. Do not change the below value (read only).
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+
+  # Node Selector Values can be defined below (Refer below example):
+  nodeSelectorKey: ""
+  nodeSelectorValue: ""
+
+  # Example for nodeSelector attribute:
+  #nodeSelectorKey: "samplenodeselectorkey"
+  #nodeSelectorValue: "samplenodeselectorvalue"
+
+  # Tolerations Setting Status (ENABLED/DISABLED/USE_GLOBAL_VALUE)
+  tolerationsSetting: "USE_GLOBAL_VALUE"
+
+  # Tolerations values can be defined below (Refer below example):
+  tolerations: []
+
+  # Example for Tolerations configuration
+  #  tolerations:
+  # - key: "exampleKey"
+  #   operator: "Equal"
+  #   value: "value1"
+  #   effect: "NoSchedule"
+
+  # Engineering configuration
+  # Maximum Unavailable perf-info pods during pod disruption/Upgrade.
+  #
+  # Note: Unlike other NRF micro-services, for perf-info there is
+  # a single attribute to configure both PDB/Upgrade maxUnavailable
+  # percentage
+  maxUnavailable: "50%"
+
+  #@Engineering-start
+  #@min_resources- replicas: 1
+  replicas: 2
+  useLbLabelsAndAnnotations: false
+  helmBasedConfigurationNodeSelectorApiVersion: "v1"
+  #@Engineering-end
+  
+  # Database name in which leader election table needs to be created
+  envMysqlDatabase: *leaderElectionDbNameRef
+  #@Engineering-start
+  envLeaderElectionTableName: perf_info_leader_election
+  leaderElectionHeartbeatInterval: 2  # float number in seconds
+  leaderElectionHeartbeatTimeout: 8   # float number in seconds
+  #@Engineering-end
+  
+  service:
+    type: ClusterIP
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  deployment:
+    customExtension:
+      labels: {}
+      annotations: {}
+
+  # Prometheus API required for overload control
+  configmapPerformance:
+    prometheus: http://occne-prometheus-server.occne-infra:80
+
+  # Resource details
+  resources:
+    limits:
+      ephemeralStorage: 1Gi
+      #@min_resources- cpu: 1
+      cpu: 1
+      #@min_resources- memory: 1Gi
+      memory: 1Gi
+    requests:
+      #@min_resources- cpu: 1
+      cpu: 1
+      #@min_resources- memory: 1Gi
+      memory: 1Gi
+
+  startupProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 20
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 10
+
+  readinessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 10
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 10
+
+  livenessProbe:
+    # tells the kubelet that it should wait xx second before performing the first probe
+    initialDelaySeconds: 20
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 15
+    # specifies that the kubelet should perform a liveness probe every xx seconds
+    periodSeconds: 15
+    # Minimum consecutive successes for the probe to be considered successful after having failed
+    successThreshold: 1
+    # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+    failureThreshold: 10
+
+  #@Engineering-start
+  fullnameOverride: ''
+
+  affinity: {}
+  #@Engineering-end
+  
+  # Allowed Values: DISABLED, ENABLED, USE_GLOBAL_VALUE
+  extraContainers: USE_GLOBAL_VALUE
+  
+  #@Engineering-start
+  # Engineering Configuration:
+  # Config client configuration
+  commonCfgClient:
+    enabled: true
+  commonCfgServer:
+    # If below parameter is present then it will be used for integrating with config-server.
+    # This parameter will be appended with the current release name when deployed with perf-info
+    # In case host name is expected, then leave this parameter blank
+    configServerSvcName: nrfconfiguration
+    host:
+    port: *configurationServicePortRef
+    pollingInterval: 5000 #(in ms)
+    connectionTimeout: 10000 #(in ms)
+  commonServiceName: *perfInfoCommonSvcNameRef
+  #@Engineering-end
+
+  overloadManager:
+    # Service Port on which OCNRF's Ingress Gateway is be exposed
+    # If https is enabled at Ingress Gateway, use reference httpsSignalPortRef. 
+    # if http is enabled at Ingress Gateway , use reference httpSignalPortRef (default)
+    ingressGatewayPort: *httpSignalPortRef
+    #Flag to Enable or Disable overloadManager
+    enabled: false
+    
+    #@Engineering-start
+    ajacentLevelDuration: 10
+    # This parameter will be appended with the current release name when deployed to contact Ingress Gateway
+    # If Host is expected, leave this parameter blank
+    ingressGatewaySvcName: ingressgateway
+    ingressGatewayHost:
+    ingressGatewayScrapeInterval: 1 #(in s)
+    ingressGatewayFailureRateLength: 60
+    perfInfoScrapeInterval: 30 #(in s)
+    nfType: NRF
+    diamGWPort: 8000
+    #@Engineering-end
+
+  # Db Hook Configuration
+  # Engineering configuration to select database (read only)
+  dbConfig:
+    dbHost: *mySqlHostRef
+    dbPort: *mySqlPortRef
+    dbName: *dbNameRef
+    secretName: *privilegedSecretNameRef
+    dbEngine: *databaseEngineRef
+    #@Engineering-start
+    # Engineering Configuration:
+    # Name of the Key configured for "DB Username" in Secret with following name: "<dbConfig.secretName>"
+    dbUNameLiteral: *dbUserRef
+    # Name of the Key configured for "DB Password" in Secret with following name: "<dbConfig.secretName>"
+    dbPwdLiteral: *dbPwdRef
+    configFile: defaultconfig.yaml
+    schemaFile: defaultschema.json
+    #@Engineering-end
+    
+
+  # Db Hook Image details
+  dbHookImage:
+    name: common_config_hook
+    tag: *gwTagRef
+    pullPolicy: *imagePullPolicyRef
+
+  #@Engineering-start
+  log:
+    level:
+      perfinfo: WARN
+  
+
+  gracefulShutdown:
+    # Grace period to wait for active requests to be handled
+    # If there are no active requests then this time period is neglected
+    # If there are pending requests even after this period, then application will be forcefully shutdown
+    gracePeriod: 1m
+  #@Engineering-end
+
+  #The sidecar (istio url) when deployed in serviceMesh
+  # Default value: http://127.0.0.1:15020/quitquitquit
+  istioSidecarQuitUrl: *istioSidecarQuitUrlRef
+  # Default value: http://127.0.0.1:15020/ready
+  istioSidecarReadyUrl: *istioSidecarReadyUrlRef
+  #Enabled when deployed in serviceMesh
+  serviceMeshCheck: *serviceMeshCheckRef
+  
+  
+  # values added to fetch labels from env variable
+  #Values for CNE 1.8 {tagNamespace: kubernetes_namespace, tagContainerName: container_name, tagServiceName: kubernetes_name}
+  #Values for CNE 1.9 {tagNamespace: namespace, tagContainerName: container, tagServiceName: service}
+  tagNamespace: namespace
+  tagContainerName: container
+  tagServiceName: service
+#########################################################
+#            Section End  : perf-info attributes      #
+#########################################################

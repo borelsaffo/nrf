@@ -1,0 +1,1102 @@
+# Copyright 2022 (C), Oracle and/or its affiliates. All rights reserved.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "preinstall.job.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": "pre-install"
+    "helm.sh/hook-weight": {{ .Values.global.hookWeight.nrfAuditor | quote }}
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "preinstall.job.fullname" . }}
+      labels:
+        {{- include "labels.allResources" . | indent 4 }}
+        app.kubernetes.io/component: internal
+      annotations:
+        {{- include "annotations.allResources" . | indent 4 }}
+    spec:
+      restartPolicy: {{ .Values.hookRestartPolicy  }}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+      {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      {{- else if(eq $helmBasedConfigurationNodeSelectorApiVersion "v1")}}
+      {{- $globalnodeselector := and  .Values.global.nodeSelector.nodeKey .Values.global.nodeSelector.nodeValue }}
+      {{- $localnodeselector := and  .Values.nodeSelector.nodeKey .Values.nodeSelector.nodeValue }}
+      {{- if or $globalnodeselector $localnodeselector }}
+      nodeSelector:
+      {{- if $localnodeselector }}
+         {{ .Values.nodeSelector.nodeKey }}: {{ .Values.nodeSelector.nodeValue }}
+      {{- else}}
+         {{ .Values.global.nodeSelector.nodeKey }}: {{ .Values.global.nodeSelector.nodeValue }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - name: {{ template "preinstall.container.fullname" . }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+          - name: DB_ENGINE
+            value: {{ .Values.global.databaseEngine | quote }}
+          - name: LOGGING_LEVEL_APP
+            value: {{ .Values.log.level | quote }}
+          - name: APP_NAME
+            value: {{ .Values.global.app_name }}
+          - name: VENDOR
+            value: {{ .Values.global.vendor }}
+          - name: HOOK_NAME
+            value: {{ template "preinstall.job.fullname" . }}
+          - name: ENGINEERING_VERSION
+            value: {{ .Chart.Version | quote }}
+          - name: MARKETING_VERSION
+            value: {{ .Chart.AppVersion | quote }}
+          - name: HOOK_TYPE
+            value: pre-install
+          - name: HOOK_VERSION
+            value: {{ .Chart.Version | quote}}
+          - name: HOOK_CONFIG_KEY
+            value: {{ .Chart.Name | quote }}
+          - name: SERVICE_MESH_CHECK
+            value: {{ template "servicemesh.check" . }}
+          - name: ISTIO_SIDECAR_READY_URL
+            value: {{ template "istioproxy.ready.url" .  }}
+          - name: ISTIO_SIDECAR_QUIT_URL
+            value: {{ template "istioproxy.quit.url" .  }}
+          - name: NF_INSTANCE_ID
+            value: {{ .Values.global.nrfInstanceId | quote }}
+          - name: MYSQL_MULTI_POD_SUPPORT_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.global.database.privilegedUserSecretName }}
+                key: leaderElectionDbName
+          - name: MYSQL_RELEASE_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.global.database.privilegedUserSecretName }}
+                key: networkScopedDbName
+          - name: MYSQL_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.global.database.privilegedUserSecretName }}
+                key: appDbName
+          - name: MYSQL_HOST
+            value: {{ .Values.global.mysql.primary.host | quote }}
+          - name: MYSQL_PORT
+            value: {{ .Values.global.mysql.primary.port | quote}}
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.global.database.privilegedUserSecretName }}
+                key: dbPassword
+          - name: MYSQL_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.global.database.privilegedUserSecretName }}
+                key: dbUsername
+          - name: K8S_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: K8S_NODE
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: MICROSERVICE_NAME
+            value: {{ template "service.fullname" . }}
+          - name: LOG_LEVEL_SYSTEM
+            value: {{ .Values.global.systemLoggingLevel }}
+          - name: LOG_LOCATION_INFO
+            value: {{ .Values.log.logLocationInfo | quote }}
+          - name: LOG4J2_BURST_RATE
+            value: {{ .Values.log.burst.rate | quote }}
+          - name: LOG4J2_BURST_MAX
+            value: {{ .Values.log.burst.max | quote }}
+          - name: CONSOLE_FORMAT
+            value: {{ .Values.log.consoleFormat | quote }}
+          - name: IS_PRE_VALIDATE_HOOK_ENABLED
+            value: {{ .Values.hooks.preValidateEnabled | quote }}
+          - name: IS_POST_VALIDATE_HOOK_ENABLED
+            value: {{ .Values.hooks.postValidateEnabled | quote }}
+          - name: NRF_INSTALL_IS_DR_ENABLED
+            value: {{ .Values.hooks.faultRecoveryMode | quote }}
+          - name: DR_VALIDATE
+            value:  {{ .Values.hooks.faultRecoveryValidate | quote  }}
+          - name: NRF_DB_SCHEMA
+            value: {{ .Values.hooks.nrfDbSchema | toJson  }}
+        resources:
+{{ toYaml .Values.global.hookJobResources | indent 10 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "postinstall.job.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": "post-install"
+    "helm.sh/hook-weight": {{ .Values.global.hookWeight.nrfAuditor | quote }}
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "postinstall.job.fullname" . }}
+      labels:
+        {{- include "labels.allResources" . | indent 4 }}
+        app.kubernetes.io/component: internal
+      annotations:
+        {{- include "annotations.allResources" . | indent 4 }}
+    spec:
+      restartPolicy: {{ .Values.hookRestartPolicy  }}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+      {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      {{- else if(eq $helmBasedConfigurationNodeSelectorApiVersion "v1")}}
+      {{- $globalnodeselector := and  .Values.global.nodeSelector.nodeKey .Values.global.nodeSelector.nodeValue }}
+      {{- $localnodeselector := and  .Values.nodeSelector.nodeKey .Values.nodeSelector.nodeValue }}
+      {{- if or $globalnodeselector $localnodeselector }}
+      nodeSelector:
+      {{- if $localnodeselector }}
+         {{ .Values.nodeSelector.nodeKey }}: {{ .Values.nodeSelector.nodeValue }}
+      {{- else}}
+         {{ .Values.global.nodeSelector.nodeKey }}: {{ .Values.global.nodeSelector.nodeValue }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - env:
+        - name: DB_ENGINE
+          value: {{ .Values.global.databaseEngine | quote }}
+        - name: LOGGING_LEVEL_APP
+          value: {{ .Values.log.level | quote }}
+        - name: APP_NAME
+          value: {{ .Values.global.app_name }}
+        - name: VENDOR
+          value: {{ .Values.global.vendor }}
+        - name: HOOK_NAME
+          value: {{ template "postinstall.job.fullname" . }}
+        - name: ENGINEERING_VERSION
+          value: {{ .Chart.Version | quote }}
+        - name: MARKETING_VERSION
+          value: {{ .Chart.AppVersion | quote }}
+        - name: HOOK_TYPE
+          value: post-install
+        - name: HOOK_VERSION
+          value: {{ .Chart.Version | quote}}
+        - name: HOOK_CONFIG_KEY
+          value: {{ .Chart.Name | quote }}
+        - name: SERVICE_MESH_CHECK
+          value: {{ template "servicemesh.check" . }}
+        - name: ISTIO_SIDECAR_READY_URL
+          value: {{ template "istioproxy.ready.url" .  }}
+        - name: ISTIO_SIDECAR_QUIT_URL
+          value: {{ template "istioproxy.quit.url" .  }}
+        - name: NF_INSTANCE_ID
+          value: {{ .Values.global.nrfInstanceId | quote }}
+        - name: MYSQL_MULTI_POD_SUPPORT_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: leaderElectionDbName
+        - name: MYSQL_RELEASE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: networkScopedDbName
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: appDbName
+        - name: MYSQL_HOST
+          value: {{ .Values.global.mysql.primary.host | quote }}
+        - name: MYSQL_PORT
+          value: {{ .Values.global.mysql.primary.port | quote}}
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbPassword
+        - name: MYSQL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbUsername
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MICROSERVICE_NAME
+          value: {{ template "service.fullname" . }}
+        - name: LOG_LEVEL_SYSTEM
+          value: {{ .Values.global.systemLoggingLevel }}
+        - name: LOG_LOCATION_INFO
+          value: {{ .Values.log.logLocationInfo | quote }}
+        - name: LOG4J2_BURST_RATE
+          value: {{ .Values.log.burst.rate | quote }}
+        - name: LOG4J2_BURST_MAX
+          value: {{ .Values.log.burst.max | quote }}
+        - name: CONSOLE_FORMAT
+          value: {{ .Values.log.consoleFormat | quote }}
+        - name: IS_PRE_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.preValidateEnabled | quote }}
+        - name: IS_POST_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.postValidateEnabled | quote }}
+        - name: NRF_INSTALL_IS_DR_ENABLED
+          value: {{ .Values.hooks.faultRecoveryMode | quote }}
+        - name: DR_VALIDATE
+          value:  {{ .Values.hooks.faultRecoveryValidate | quote  }}
+        - name: NRF_DB_SCHEMA
+          value: {{ .Values.hooks.nrfDbSchema | toJson }}
+        name: {{ template "postinstall.container.fullname" . }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+{{ toYaml .Values.global.hookJobResources | indent 10 }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "preupgrade.job.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": "pre-upgrade"
+    "helm.sh/hook-weight": {{ .Values.global.hookWeight.nrfAuditor | quote }}
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "preupgrade.job.fullname" . }}
+      labels:
+        {{- include "labels.allResources" . | indent 4 }}
+        app.kubernetes.io/component: internal
+      annotations:
+        {{- include "annotations.allResources" . | indent 4 }}
+    spec:
+      restartPolicy: {{ .Values.hookRestartPolicy  }}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+      {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      {{- else if(eq $helmBasedConfigurationNodeSelectorApiVersion "v1")}}
+      {{- $globalnodeselector := and  .Values.global.nodeSelector.nodeKey .Values.global.nodeSelector.nodeValue }}
+      {{- $localnodeselector := and  .Values.nodeSelector.nodeKey .Values.nodeSelector.nodeValue }}
+      {{- if or $globalnodeselector $localnodeselector }}
+      nodeSelector:
+      {{- if $localnodeselector }}
+         {{ .Values.nodeSelector.nodeKey }}: {{ .Values.nodeSelector.nodeValue }}
+      {{- else}}
+         {{ .Values.global.nodeSelector.nodeKey }}: {{ .Values.global.nodeSelector.nodeValue }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - env:
+        - name: DB_ENGINE
+          value: {{ .Values.global.databaseEngine | quote }}
+        - name: LOGGING_LEVEL_APP
+          value: {{ .Values.log.level | quote }}
+        - name: APP_NAME
+          value: {{ .Values.global.app_name }}
+        - name: VENDOR
+          value: {{ .Values.global.vendor }}
+        - name: HOOK_NAME
+          value: {{ template "preupgrade.job.fullname" . }}
+        - name: ENGINEERING_VERSION
+          value: {{ .Chart.Version | quote }}
+        - name: MARKETING_VERSION
+          value: {{ .Chart.AppVersion | quote }}
+        - name: HOOK_TYPE
+          value: pre-upgrade
+        - name: HOOK_VERSION
+          value: {{ .Chart.Version | quote}}
+        - name: HOOK_CONFIG_KEY
+          value: {{ .Chart.Name | quote }}
+        - name: SERVICE_MESH_CHECK
+          value: {{ template "servicemesh.check" . }}
+        - name: ISTIO_SIDECAR_READY_URL
+          value: {{ template "istioproxy.ready.url" .  }}
+        - name: ISTIO_SIDECAR_QUIT_URL
+          value: {{ template "istioproxy.quit.url" .  }}
+        - name: NF_INSTANCE_ID
+          value: {{ .Values.global.nrfInstanceId | quote }}
+        - name: MYSQL_MULTI_POD_SUPPORT_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: leaderElectionDbName
+        - name: MYSQL_RELEASE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: networkScopedDbName
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: appDbName
+        - name: MYSQL_HOST
+          value: {{ .Values.global.mysql.primary.host | quote }}
+        - name: MYSQL_PORT
+          value: {{ .Values.global.mysql.primary.port | quote}}
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbPassword
+        - name: MYSQL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbUsername
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MICROSERVICE_NAME
+          value: {{ template "service.fullname" . }}
+        - name: LOG_LEVEL_SYSTEM
+          value: {{ .Values.global.systemLoggingLevel }}
+        - name: LOG_LOCATION_INFO
+          value: {{ .Values.log.logLocationInfo | quote }}
+        - name: LOG4J2_BURST_RATE
+          value: {{ .Values.log.burst.rate | quote }}
+        - name: LOG4J2_BURST_MAX
+          value: {{ .Values.log.burst.max | quote }}
+        - name: CONSOLE_FORMAT
+          value: {{ .Values.log.consoleFormat | quote }}
+        - name: IS_PRE_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.preValidateEnabled | quote }}
+        - name: IS_POST_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.postValidateEnabled | quote }}
+        - name: NRF_INSTALL_IS_DR_ENABLED
+          value: {{ .Values.hooks.faultRecoveryMode | quote }}
+        - name: DR_VALIDATE
+          value:  {{ .Values.hooks.faultRecoveryValidate | quote  }}
+        - name: NRF_DB_SCHEMA
+          value: {{ .Values.hooks.nrfDbSchema | toJson  }}
+        name: {{ template "preupgrade.container.fullname" . }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+{{ toYaml .Values.global.hookJobResources | indent 10 }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "postupgrade.job.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": "post-upgrade"
+    "helm.sh/hook-weight": {{ .Values.global.hookWeight.nrfAuditor | quote }}
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "postupgrade.job.fullname" . }}
+      labels:
+        {{- include "labels.allResources" . | indent 4 }}
+        app.kubernetes.io/component: internal
+      annotations:
+        {{- include "annotations.allResources" . | indent 4 }}
+    spec:
+      restartPolicy: {{ .Values.hookRestartPolicy  }}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+      {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      {{- else if(eq $helmBasedConfigurationNodeSelectorApiVersion "v1")}}
+      {{- $globalnodeselector := and  .Values.global.nodeSelector.nodeKey .Values.global.nodeSelector.nodeValue }}
+      {{- $localnodeselector := and  .Values.nodeSelector.nodeKey .Values.nodeSelector.nodeValue }}
+      {{- if or $globalnodeselector $localnodeselector }}
+      nodeSelector:
+      {{- if $localnodeselector }}
+         {{ .Values.nodeSelector.nodeKey }}: {{ .Values.nodeSelector.nodeValue }}
+      {{- else}}
+         {{ .Values.global.nodeSelector.nodeKey }}: {{ .Values.global.nodeSelector.nodeValue }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - env:
+        - name: DB_ENGINE
+          value: {{ .Values.global.databaseEngine | quote }}
+        - name: LOGGING_LEVEL_APP
+          value: {{ .Values.log.level | quote }}
+        - name: APP_NAME
+          value: {{ .Values.global.app_name }}
+        - name: VENDOR
+          value: {{ .Values.global.vendor }}
+        - name: HOOK_NAME
+          value: {{ template "postupgrade.job.fullname" . }}
+        - name: ENGINEERING_VERSION
+          value: {{ .Chart.Version | quote }}
+        - name: MARKETING_VERSION
+          value: {{ .Chart.AppVersion | quote }}
+        - name: HOOK_TYPE
+          value: post-upgrade
+        - name: HOOK_VERSION
+          value: {{ .Chart.Version | quote}}
+        - name: HOOK_CONFIG_KEY
+          value: {{ .Chart.Name | quote }}
+        - name: SERVICE_MESH_CHECK
+          value: {{ template "servicemesh.check" . }}
+        - name: ISTIO_SIDECAR_READY_URL
+          value: {{ template "istioproxy.ready.url" .  }}
+        - name: ISTIO_SIDECAR_QUIT_URL
+          value: {{ template "istioproxy.quit.url" .  }}
+        - name: NF_INSTANCE_ID
+          value: {{ .Values.global.nrfInstanceId | quote }}
+        - name: MYSQL_MULTI_POD_SUPPORT_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: leaderElectionDbName
+        - name: MYSQL_RELEASE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: networkScopedDbName
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: appDbName
+        - name: MYSQL_HOST
+          value: {{ .Values.global.mysql.primary.host | quote }}
+        - name: MYSQL_PORT
+          value: {{ .Values.global.mysql.primary.port | quote}}
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbPassword
+        - name: MYSQL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbUsername
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MICROSERVICE_NAME
+          value: {{ template "service.fullname" . }}
+        - name: LOG_LEVEL_SYSTEM
+          value: {{ .Values.global.systemLoggingLevel }}
+        - name: LOG_LOCATION_INFO
+          value: {{ .Values.log.logLocationInfo | quote }}
+        - name: LOG4J2_BURST_RATE
+          value: {{ .Values.log.burst.rate | quote }}
+        - name: LOG4J2_BURST_MAX
+          value: {{ .Values.log.burst.max | quote }}
+        - name: CONSOLE_FORMAT
+          value: {{ .Values.log.consoleFormat | quote }}
+        - name: IS_PRE_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.preValidateEnabled | quote }}
+        - name: IS_POST_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.postValidateEnabled | quote }}
+        - name: NRF_INSTALL_IS_DR_ENABLED
+          value: {{ .Values.hooks.faultRecoveryMode | quote }}
+        - name: DR_VALIDATE
+          value:  {{ .Values.hooks.faultRecoveryValidate | quote  }}
+        - name: NRF_DB_SCHEMA
+          value: {{ .Values.hooks.nrfDbSchema | toJson  }}
+        name: {{ template "postupgrade.container.fullname" . }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+{{ toYaml .Values.global.hookJobResources | indent 10 }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "prerollback.job.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": "pre-rollback"
+    "helm.sh/hook-weight": {{ .Values.global.hookWeight.nrfAuditor | quote }}
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "prerollback.job.fullname" . }}
+      labels:
+        {{- include "labels.allResources" . | indent 4 }}
+        app.kubernetes.io/component: internal
+      annotations:
+        {{- include "annotations.allResources" . | indent 4 }}
+    spec:
+      restartPolicy: {{ .Values.hookRestartPolicy  }}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+      {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      {{- else if(eq $helmBasedConfigurationNodeSelectorApiVersion "v1")}}
+      {{- $globalnodeselector := and  .Values.global.nodeSelector.nodeKey .Values.global.nodeSelector.nodeValue }}
+      {{- $localnodeselector := and  .Values.nodeSelector.nodeKey .Values.nodeSelector.nodeValue }}
+      {{- if or $globalnodeselector $localnodeselector }}
+      nodeSelector:
+      {{- if $localnodeselector }}
+         {{ .Values.nodeSelector.nodeKey }}: {{ .Values.nodeSelector.nodeValue }}
+      {{- else}}
+         {{ .Values.global.nodeSelector.nodeKey }}: {{ .Values.global.nodeSelector.nodeValue }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - env:
+        - name: DB_ENGINE
+          value: {{ .Values.global.databaseEngine | quote }}
+        - name: LOGGING_LEVEL_APP
+          value: {{ .Values.log.level | quote }}
+        - name: APP_NAME
+          value: {{ .Values.global.app_name }}
+        - name: VENDOR
+          value: {{ .Values.global.vendor }}
+        - name: HOOK_NAME
+          value: {{ template "prerollback.job.fullname" . }}
+        - name: ENGINEERING_VERSION
+          value: {{ .Chart.Version | quote }}
+        - name: MARKETING_VERSION
+          value: {{ .Chart.AppVersion | quote }}
+        - name: HOOK_TYPE
+          value: pre-rollback
+        - name: HOOK_VERSION
+          value: {{ .Chart.Version | quote}}
+        - name: HOOK_CONFIG_KEY
+          value: {{ .Chart.Name | quote }}
+        - name: SERVICE_MESH_CHECK
+          value: {{ template "servicemesh.check" . }}
+        - name: ISTIO_SIDECAR_READY_URL
+          value: {{ template "istioproxy.ready.url" .  }}
+        - name: ISTIO_SIDECAR_QUIT_URL
+          value: {{ template "istioproxy.quit.url" .  }}
+        - name: NF_INSTANCE_ID
+          value: {{ .Values.global.nrfInstanceId | quote }}
+        - name: MYSQL_MULTI_POD_SUPPORT_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: leaderElectionDbName
+        - name: MYSQL_RELEASE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: networkScopedDbName
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: appDbName
+        - name: MYSQL_HOST
+          value: {{ .Values.global.mysql.primary.host | quote }}
+        - name: MYSQL_PORT
+          value: {{ .Values.global.mysql.primary.port | quote}}
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbPassword
+        - name: MYSQL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbUsername
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MICROSERVICE_NAME
+          value: {{ template "service.fullname" . }}
+        - name: LOG_LEVEL_SYSTEM
+          value: {{ .Values.global.systemLoggingLevel }}
+        - name: LOG_LOCATION_INFO
+          value: {{ .Values.log.logLocationInfo | quote }}
+        - name: LOG4J2_BURST_RATE
+          value: {{ .Values.log.burst.rate | quote }}
+        - name: LOG4J2_BURST_MAX
+          value: {{ .Values.log.burst.max | quote }}
+        - name: CONSOLE_FORMAT
+          value: {{ .Values.log.consoleFormat | quote }}
+        - name: IS_PRE_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.preValidateEnabled | quote }}
+        - name: IS_POST_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.postValidateEnabled | quote }}
+        - name: NRF_INSTALL_IS_DR_ENABLED
+          value: {{ .Values.hooks.faultRecoveryMode | quote }}
+        - name: DR_VALIDATE
+          value:  {{ .Values.hooks.faultRecoveryValidate | quote  }}
+        - name: NRF_DB_SCHEMA
+          value: {{ .Values.hooks.nrfDbSchema | toJson  }}
+        name: {{ template "prerollback.container.fullname" . }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+{{ toYaml .Values.global.hookJobResources | indent 10 }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "postrollback.job.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": "post-rollback"
+    "helm.sh/hook-weight": {{ .Values.global.hookWeight.nrfAuditor | quote }}
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "postrollback.job.fullname" . }}
+      labels:
+        {{- include "labels.allResources" . | indent 4 }}
+        app.kubernetes.io/component: internal
+      annotations:
+        {{- include "annotations.allResources" . | indent 4 }}
+    spec:
+      restartPolicy: {{ .Values.hookRestartPolicy  }}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+      {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      {{- else if(eq $helmBasedConfigurationNodeSelectorApiVersion "v1")}}
+      {{- $globalnodeselector := and  .Values.global.nodeSelector.nodeKey .Values.global.nodeSelector.nodeValue }}
+      {{- $localnodeselector := and  .Values.nodeSelector.nodeKey .Values.nodeSelector.nodeValue }}
+      {{- if or $globalnodeselector $localnodeselector }}
+      nodeSelector:
+      {{- if $localnodeselector }}
+         {{ .Values.nodeSelector.nodeKey }}: {{ .Values.nodeSelector.nodeValue }}
+      {{- else}}
+         {{ .Values.global.nodeSelector.nodeKey }}: {{ .Values.global.nodeSelector.nodeValue }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - env:
+        - name: DB_ENGINE
+          value: {{ .Values.global.databaseEngine | quote }}
+        - name: LOGGING_LEVEL_APP
+          value: {{ .Values.log.level | quote }}
+        - name: APP_NAME
+          value: {{ .Values.global.app_name }}
+        - name: VENDOR
+          value: {{ .Values.global.vendor }}
+        - name: HOOK_NAME
+          value: {{ template "postrollback.job.fullname" . }}
+        - name: ENGINEERING_VERSION
+          value: {{ .Chart.Version | quote }}
+        - name: MARKETING_VERSION
+          value: {{ .Chart.AppVersion | quote }}
+        - name: HOOK_TYPE
+          value: post-rollback
+        - name: HOOK_VERSION
+          value: {{ .Chart.Version | quote}}
+        - name: HOOK_CONFIG_KEY
+          value: {{ .Chart.Name | quote }}
+        - name: SERVICE_MESH_CHECK
+          value: {{ template "servicemesh.check" . }}
+        - name: ISTIO_SIDECAR_READY_URL
+          value: {{ template "istioproxy.ready.url" .  }}
+        - name: ISTIO_SIDECAR_QUIT_URL
+          value: {{ template "istioproxy.quit.url" .  }}
+        - name: NF_INSTANCE_ID
+          value: {{ .Values.global.nrfInstanceId | quote }}
+        - name: MYSQL_MULTI_POD_SUPPORT_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: leaderElectionDbName
+        - name: MYSQL_RELEASE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: networkScopedDbName
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: appDbName
+        - name: MYSQL_HOST
+          value: {{ .Values.global.mysql.primary.host | quote }}
+        - name: MYSQL_PORT
+          value: {{ .Values.global.mysql.primary.port | quote}}
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbPassword
+        - name: MYSQL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbUsername
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MICROSERVICE_NAME
+          value: {{ template "service.fullname" . }}
+        - name: LOG_LEVEL_SYSTEM
+          value: {{ .Values.global.systemLoggingLevel }}
+        - name: LOG_LOCATION_INFO
+          value: {{ .Values.log.logLocationInfo | quote }}
+        - name: LOG4J2_BURST_RATE
+          value: {{ .Values.log.burst.rate | quote }}
+        - name: LOG4J2_BURST_MAX
+          value: {{ .Values.log.burst.max | quote }}
+        - name: CONSOLE_FORMAT
+          value: {{ .Values.log.consoleFormat | quote }}
+        - name: IS_PRE_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.preValidateEnabled | quote }}
+        - name: IS_POST_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.postValidateEnabled | quote }}
+        - name: NRF_INSTALL_IS_DR_ENABLED
+          value: {{ .Values.hooks.faultRecoveryMode | quote }}
+        - name: DR_VALIDATE
+          value:  {{ .Values.hooks.faultRecoveryValidate | quote  }}
+        - name: NRF_DB_SCHEMA
+          value: {{ .Values.hooks.nrfDbSchema | toJson  }}
+        name: {{ template "postrollback.container.fullname" . }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+{{ toYaml .Values.global.hookJobResources | indent 10 }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "predelete.job.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": "pre-delete"
+    "helm.sh/hook-weight": {{ .Values.global.hookWeight.nrfAuditor | quote }}
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "predelete.job.fullname" . }}
+      labels:
+        {{- include "labels.allResources" . | indent 4 }}
+        app.kubernetes.io/component: internal
+      annotations:
+        {{- include "annotations.allResources" . | indent 4 }}
+    spec:
+      restartPolicy: {{ .Values.hookRestartPolicy  }}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+      {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      {{- else if(eq $helmBasedConfigurationNodeSelectorApiVersion "v1")}}
+      {{- $globalnodeselector := and  .Values.global.nodeSelector.nodeKey .Values.global.nodeSelector.nodeValue }}
+      {{- $localnodeselector := and  .Values.nodeSelector.nodeKey .Values.nodeSelector.nodeValue }}
+      {{- if or $globalnodeselector $localnodeselector }}
+      nodeSelector:
+      {{- if $localnodeselector }}
+         {{ .Values.nodeSelector.nodeKey }}: {{ .Values.nodeSelector.nodeValue }}
+      {{- else}}
+         {{ .Values.global.nodeSelector.nodeKey }}: {{ .Values.global.nodeSelector.nodeValue }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - env:
+        - name: DB_ENGINE
+          value: {{ .Values.global.databaseEngine | quote }}
+        - name: LOGGING_LEVEL_APP
+          value: {{ .Values.log.level | quote }}
+        - name: APP_NAME
+          value: {{ .Values.global.app_name }}
+        - name: VENDOR
+          value: {{ .Values.global.vendor }}
+        - name: HOOK_NAME
+          value: {{ template "predelete.job.fullname" . }}
+        - name: ENGINEERING_VERSION
+          value: {{ .Chart.Version | quote }}
+        - name: MARKETING_VERSION
+          value: {{ .Chart.AppVersion | quote }}
+        - name: HOOK_TYPE
+          value: pre-delete
+        - name: HOOK_VERSION
+          value: {{ .Chart.Version | quote}}
+        - name: HOOK_CONFIG_KEY
+          value: {{ .Chart.Name | quote }}
+        - name: SERVICE_MESH_CHECK
+          value: {{ template "servicemesh.check" . }}
+        - name: ISTIO_SIDECAR_READY_URL
+          value: {{ template "istioproxy.ready.url" .  }}
+        - name: ISTIO_SIDECAR_QUIT_URL
+          value: {{ template "istioproxy.quit.url" .  }}
+        - name: NF_INSTANCE_ID
+          value: {{ .Values.global.nrfInstanceId | quote }}
+        - name: MYSQL_MULTI_POD_SUPPORT_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: leaderElectionDbName
+        - name: MYSQL_RELEASE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: networkScopedDbName
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: appDbName
+        - name: MYSQL_HOST
+          value: {{ .Values.global.mysql.primary.host | quote }}
+        - name: MYSQL_PORT
+          value: {{ .Values.global.mysql.primary.port | quote}}
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbPassword
+        - name: MYSQL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbUsername
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MICROSERVICE_NAME
+          value: {{ template "service.fullname" . }}
+        - name: LOG_LEVEL_SYSTEM
+          value: {{ .Values.global.systemLoggingLevel }}
+        - name: LOG_LOCATION_INFO
+          value: {{ .Values.log.logLocationInfo | quote }}
+        - name: LOG4J2_BURST_RATE
+          value: {{ .Values.log.burst.rate | quote }}
+        - name: LOG4J2_BURST_MAX
+          value: {{ .Values.log.burst.max | quote }}
+        - name: CONSOLE_FORMAT
+          value: {{ .Values.log.consoleFormat | quote }}
+        - name: IS_PRE_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.preValidateEnabled | quote }}
+        - name: IS_POST_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.postValidateEnabled | quote }}
+        - name: NRF_INSTALL_IS_DR_ENABLED
+          value: {{ .Values.hooks.faultRecoveryMode | quote }}
+        - name: DR_VALIDATE
+          value:  {{ .Values.hooks.faultRecoveryValidate | quote  }}
+        - name: NRF_DB_SCHEMA
+          value: {{ .Values.hooks.nrfDbSchema | toJson  }}
+        name: {{ template "predelete.container.fullname" . }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+{{ toYaml .Values.global.hookJobResources | indent 10 }}
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "postdelete.job.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    "helm.sh/hook": "post-delete"
+    "helm.sh/hook-weight": {{ .Values.global.hookWeight.nrfAuditor | quote }}
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "postdelete.job.fullname" . }}
+      labels:
+        {{- include "labels.allResources" . | indent 4 }}
+        app.kubernetes.io/component: internal
+      annotations:
+        {{- include "annotations.allResources" . | indent 4 }}
+    spec:
+      restartPolicy: {{ .Values.hookRestartPolicy  }}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      {{- $helmBasedConfigurationNodeSelectorApiVersion:= .Values.helmBasedConfigurationNodeSelectorApiVersion | default "v1" }}
+      {{- if (eq $helmBasedConfigurationNodeSelectorApiVersion "v2") }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      {{- else if(eq $helmBasedConfigurationNodeSelectorApiVersion "v1")}}
+      {{- $globalnodeselector := and  .Values.global.nodeSelector.nodeKey .Values.global.nodeSelector.nodeValue }}
+      {{- $localnodeselector := and  .Values.nodeSelector.nodeKey .Values.nodeSelector.nodeValue }}
+      {{- if or $globalnodeselector $localnodeselector }}
+      nodeSelector:
+      {{- if $localnodeselector }}
+         {{ .Values.nodeSelector.nodeKey }}: {{ .Values.nodeSelector.nodeValue }}
+      {{- else}}
+         {{ .Values.global.nodeSelector.nodeKey }}: {{ .Values.global.nodeSelector.nodeValue }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+      - env:
+        - name: DB_ENGINE
+          value: {{ .Values.global.databaseEngine | quote }}
+        - name: LOGGING_LEVEL_APP
+          value: {{ .Values.log.level | quote }}
+        - name: APP_NAME
+          value: {{ .Values.global.app_name }}
+        - name: VENDOR
+          value: {{ .Values.global.vendor }}
+        - name: HOOK_NAME
+          value: {{ template "postdelete.job.fullname" . }}
+        - name: ENGINEERING_VERSION
+          value: {{ .Chart.Version | quote }}
+        - name: MARKETING_VERSION
+          value: {{ .Chart.AppVersion | quote }}
+        - name: HOOK_TYPE
+          value: post-delete
+        - name: HOOK_VERSION
+          value: {{ .Chart.Version | quote}}
+        - name: HOOK_CONFIG_KEY
+          value: {{ .Chart.Name | quote }}
+        - name: SERVICE_MESH_CHECK
+          value: {{ template "servicemesh.check" . }}
+        - name: ISTIO_SIDECAR_READY_URL
+          value: {{ template "istioproxy.ready.url" .  }}
+        - name: ISTIO_SIDECAR_QUIT_URL
+          value: {{ template "istioproxy.quit.url" .  }}
+        - name: NF_INSTANCE_ID
+          value: {{ .Values.global.nrfInstanceId | quote }}
+        - name: MYSQL_MULTI_POD_SUPPORT_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: leaderElectionDbName
+        - name: MYSQL_RELEASE_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: networkScopedDbName
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: appDbName
+        - name: MYSQL_HOST
+          value: {{ .Values.global.mysql.primary.host | quote }}
+        - name: MYSQL_PORT
+          value: {{ .Values.global.mysql.primary.port | quote}}
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbPassword
+        - name: MYSQL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.global.database.privilegedUserSecretName }}
+              key: dbUsername
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: K8S_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MICROSERVICE_NAME
+          value: {{ template "service.fullname" . }}
+        - name: LOG_LEVEL_SYSTEM
+          value: {{ .Values.global.systemLoggingLevel }}
+        - name: LOG_LOCATION_INFO
+          value: {{ .Values.log.logLocationInfo | quote }}
+        - name: LOG4J2_BURST_RATE
+          value: {{ .Values.log.burst.rate | quote }}
+        - name: LOG4J2_BURST_MAX
+          value: {{ .Values.log.burst.max | quote }}
+        - name: CONSOLE_FORMAT
+          value: {{ .Values.log.consoleFormat | quote }}
+        - name: IS_PRE_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.preValidateEnabled | quote }}
+        - name: IS_POST_VALIDATE_HOOK_ENABLED
+          value: {{ .Values.hooks.postValidateEnabled | quote }}
+        - name: NRF_INSTALL_IS_DR_ENABLED
+          value: {{ .Values.hooks.faultRecoveryMode | quote }}
+        - name: DR_VALIDATE
+          value:  {{ .Values.hooks.faultRecoveryValidate | quote  }}
+        - name: NRF_DB_SCHEMA
+          value: {{ .Values.hooks.nrfDbSchema | toJson  }}
+        name: {{ template "postdelete.container.fullname" . }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+{{ toYaml .Values.global.hookJobResources | indent 10 }}

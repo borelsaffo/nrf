@@ -1,0 +1,79 @@
+# Copyright 2021 (C), Oracle and/or its affiliates. All rights reserved.
+
+global:
+  logStorage: 70
+  crictlStorage: 1
+  defaultCapacity: 100
+ 
+image:
+  name: ocnrf-nrfartisan
+  tag: 1.0.0
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port:
+    http: 8080
+
+replicaCount: 1
+
+resources:
+  limits:
+     cpu: 4
+     memory: 2Gi
+  requests:
+    cpu: 4
+    memory: 2Gi
+  target:
+    averageCpuUtil: 80
+
+minReplicas: 2
+maxReplicas: 7
+
+log:
+  level: WARN
+  burst:
+    rate: 750
+    max: 3000
+  logLocationInfo: false
+  consoleFormat: jsonConsole
+  
+server:
+  maxConnections: 10000
+  queueSize: 100
+  maxThreads: 200
+  spareThreads: 20
+  waitTime: 35
+  
+jetty:
+   maxConcurrentPushedStreams: 1000
+   maxRequestsQueuedPerDestination: 1024
+   maxConnectionsPerDestination: 4 
+   maxConnectionsPerIp: 4
+   request:
+      timeout: 4000
+   connectionTimeout: 10000
+   idleTimeout: 10000
+   dnsRefreshDelay: 2000
+   pingDelay: 30
+   connectionFailureThreshold: 10
+ 
+#@Engineering-start
+# Engineering Configuration: setting hikari pool size
+# and Idle Timeout for DB Connections
+hikariPoolSize: 30
+hikariConnectionTimeout: 10000
+# hikariMinimumIdle should be less than maximum pool size
+hikariMinimumIdle: 10
+hikariIdleTimeout: 500000
+
+  
+# Watch Dog configuration  
+watchDog:
+  isThreadWatchDogEnabled: true
+  watchDogMonitoringInterval: 10000
+  watchDogFailureRange: 2,4,6
+# Thread Max-Execution Time should be max among idleTimeout & connectionTimeout of jetty config in milli seconds
+  watchDogThreadMaxExecutionTime: 65000
+
+tolerations: []

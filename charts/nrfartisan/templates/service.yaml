@@ -1,0 +1,25 @@
+# Copyright 2022 (C), Oracle and/or its affiliates. All rights reserved.
+{{- if $.Values.global.enableNrfArtisanService }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "service.fullname" . }}
+  
+  labels:
+    {{- include "labels.nonlbServices" . }}
+    app.kubernetes.io/component: internal
+    category: ocnrf
+    #io.kompose.service: {{ template "service.fullname" . }}
+  annotations:
+    {{- include "annotations.nonlbServices" . }}
+spec:
+  ports:
+  - port: {{ .Values.global.nrfartisan.portConfiguration.servicePort }}
+    targetPort: {{ .Values.global.nrfartisan.portConfiguration.containerPort }}
+    name: http2-internal
+  selector:
+    app.kubernetes.io/name: {{ template "chart.fullname" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    #io.kompose.service:  {{ template "service.fullname" . }}
+  type: {{ .Values.service.type }}
+{{- end }}

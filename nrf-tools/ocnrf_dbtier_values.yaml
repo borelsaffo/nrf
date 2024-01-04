@@ -1,0 +1,1131 @@
+# Default values for cndbtier mysql ndb cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# These values need to be global because they are needed in more than one chart
+global:
+  repository: "docker_repo:5000/occne"
+  siteid: 1
+  sitename: cndbtiersitename
+  image:
+    tag: 23.2.0
+    imagePullPolicy: IfNotPresent
+  mgmReplicaCount: 3
+  ndbReplicaCount: 4
+  apiReplicaCount: 4
+  ndbappReplicaCount: 4
+  # ndbappReplicaMaxCount should always be greater than ndbappReplicaCount
+  ndbappReplicaMaxCount: 4
+  domain: cluster.local
+  namespace: occne-cndbtier
+  storageClassName: occne-dbtier-sc
+  useasm: false
+  # When k8s is used in IPv6 only or in dual-stack mode, set useIPv6 to true
+  useIPv6: false
+  useVCNEEgress: false
+
+  # cnDBTier version
+  version: "23.2.0"
+
+  autoscaling:
+    ndbapp:
+      enabled: false
+  
+  inframonitor:
+    pvchealth:
+      enable:
+        all: true
+        mgm: true
+        ndb: true
+        api: true
+
+  multus:
+    enable: false
+    serviceAccount: 
+      create: true
+      name: "cndbtier-multus-serviceaccount"
+
+  # used for enabling and disabling the encryption of backups.
+  # K8 Secret where backup_encryption_password will be stored which is used for encryption of the backups.
+  backupencryption:
+    enable: true
+    backupencryptionsecret: "occne-backup-encryption-secret"
+    
+  # When serviceAccountName is given then cnDBTier test pod and replication svc
+  # will use the given service account name instead of creating one
+  serviceAccount:
+    create: true
+    name: ""
+
+  serviceAccountForUpgrade:
+    create: true
+    name: "cndbtier-upgrade-serviceaccount"
+  
+  automountServiceAccountToken: false
+  
+  prometheusOperator:
+    alerts:
+      enable: false
+
+  k8sResource:
+    container:
+      prefix: ""
+    pod:
+      prefix: ""
+  
+  https:
+    enable: false
+  encryption:
+    enable: false
+
+
+  # When we need to add Common labels for all containers
+  commonlabels: {}
+
+  # When running mysql cluster on small k8s clusters with less than the required k8s nods,
+  # affinity rules need to be turned off. This may be required for testing in some small systems.
+  use_affinity_rules: true
+
+
+  # values for configuration files, cnf
+  ndbconfigurations:
+    mgm:
+      HeartbeatIntervalMgmdMgmd: 2000
+      TotalSendBufferMemory: 16M
+      startNodeId: 49
+    ndb:
+      MaxNoOfAttributes: 5000
+      MaxNoOfOrderedIndexes: 1024
+      NoOfFragmentLogParts: 4
+      MaxNoOfExecutionThreads: 8
+      StopOnError: 0
+      MaxNoOfTables: 1024
+      NoOfFragmentLogFiles: 128
+    api:
+      user: mysql
+      max_connections: 4096
+      all_row_changes_to_bin_log: 1
+      binlog_expire_logs_seconds: '86400'
+      auto_increment_increment: 4
+      auto_increment_offset: 1
+      wait_timeout: 600
+      interactive_timeout: 600
+
+  additionalndbconfigurations:
+    mgm: {}
+    ndb:
+      __TransactionErrorLogLevel: '0x0000'
+      CompressedLCP: false
+      TransactionDeadlockDetectionTimeout: 1200
+      HeartbeatIntervalDbDb: 500
+      LockPagesInMainMemory: 0
+      MaxNoOfConcurrentOperations: 128K
+      MaxNoOfConcurrentTransactions: 65536
+      MaxNoOfUniqueHashIndexes: 16K
+      FragmentLogFileSize: 16M
+      ODirect: true
+      RedoBuffer: 32M
+      SchedulerExecutionTimer: 50
+      SchedulerSpinTimer: 0
+      TimeBetweenEpochs: 100
+      TimeBetweenGlobalCheckpoints: 2000
+      TimeBetweenLocalCheckpoints: 20
+      TimeBetweenEpochsTimeout: 4000
+      TimeBetweenGlobalCheckpointsTimeout: 60000
+      # By default LcpScanProgressTimeout is configured to overwrite configure LcpScanProgressTimeout
+      # with required value.
+      # LcpScanProgressTimeout: 180
+      RedoOverCommitLimit: 60
+      RedoOverCommitCounter: 3
+      StartPartitionedTimeout: '1800000'
+      CompressedBackup: 'true'
+    api:
+      DefaultOperationRedoProblemAction: 'ABORT'
+    mysqld:
+      ndb_applier_allow_skip_epoch: 0
+      ndb_batch_size: '2000000'
+      ndb_blob_write_batch_bytes: '2000000'
+      replica_allow_batching: 'ON'
+      max_allowed_packet: '134217728'
+      # use replica_skip_errors as slave-skip-errors/slave_skip_errors is deprecated
+      replica_skip_errors: '1007,1008,1050,1051'
+      replica_parallel_workers: 4
+      ndb_allow_copying_alter_table: 'OFF'
+      ndb_clear_apply_status: 'OFF'
+    tcp: {}
+
+  # specific mysql cluster node values needed in different charts
+  mgm:
+    ndbdisksize: 15Gi
+  ndb:
+    ndbdisksize: 50Gi
+    ndbbackupdisksize: 60Gi
+    datamemory: 12G
+    KeepAliveSendIntervalMs: 60000
+    use_separate_backup_disk: true
+    restoreparallelism: 128
+  api:
+    ndbdisksize: 100Gi
+    startNodeId: 56
+    startEmptyApiSlotNodeId: 222
+    numOfEmptyApiSlots: 4
+    general_log: 'ON'
+  ndbapp:
+    ndbdisksize: 100Gi
+    ndb_cluster_connection_pool: 1
+    ndb_cluster_connection_pool_base_nodeid: 100
+    startNodeId: 70
+
+  services:
+    ipFamilyPolicy: SingleStack
+    primaryDualStackIpFamily: IPv6
+
+  multiplereplicationgroups:
+    enabled: false
+    replicationchannelgroups:
+      - channelgroupid: 1
+        binlogdodb: {}
+        binlogignoredb: {}
+        sqllist: {}
+      - channelgroupid: 2
+        binlogdodb: {}
+        binlogignoredb: {}
+        sqllist: {}
+  
+  replicationskiperrors: 
+    enable: false
+    numberofskiperrorsallowed: '5'
+    skiperrorsallowedintimewindow: '3600'
+    epochTimeIntervalLowerThreshold:  '10000'
+    epochTimeIntervalHigherThreshold:  '80000'
+    replicationerrornumbers:  
+      - errornumber: 13119
+      - errornumber: 1296
+
+# From here on, values can only be used in their particular chart
+
+# node aliases: mgmd, ndb_mgm, ndb_mgmd, ndbmgm, ndbmgmd
+mgm:
+  inframonitor:
+    image:
+      name: "db-infra-monitor-svc"
+      repository: db_infra_monitor_svc
+      tag: 23.2.0
+      imagePullPolicy: "IfNotPresent"
+  resources:
+    limits:
+      cpu: 4
+      memory: 6Gi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 4
+      memory: 6Gi
+      ephemeral-storage: 90Mi
+  annotations:
+    - sidecar.istio.io/inject: "true"
+  commonlabels:
+    - nf-vendor: oracle
+    - nf-instance: oc-cndbtier
+    - nf-type: database
+    - component: database
+  anti_pod_affinity:
+    anti_affinity_topologyKey: kubernetes.io/hostname
+    anti_affinity_key: dbtierndbnode
+    anti_affinity_values:
+      - dbtierndbmgmnode
+  nodeSelector: []
+
+  use_pod_affinity_rules: false
+  pod_affinity:
+    pod_affinity_topologyKey: failure-domain.beta.kubernetes.io/zone
+    pod_affinity_key: ndbnode
+    pod_affinity_values:
+      - ndbmgmnode
+
+  nodeAffinity: 
+    enable: false
+    requiredDuringScheduling:
+      enable: true
+      affinitykeyvalues:
+      - keyname: custom_key
+        keyvalues: 
+        - customvalue1
+        - customvalue2
+    preferredDuringScheduling:
+      enable: false
+      expressions:
+      - weight: 1
+        affinitykeyvalues:
+        - keyname: custom_key
+          keyvalues: 
+          - customvalue1
+          - customvalue2
+
+  service:
+    labels:
+      - app: occne_infra
+      - cis.f5.com/as3-tenant: occne_infra
+      - cis.f5.com/as3-app: svc_occne_infra_ndbmgmnode
+      - cis.f5.com/as3-pool: svc_occne_infra_pool
+  selector:
+    - ndbcontroller.mysql.com/v1alpha1: ndb-ndbmgmd
+
+# node aliases: ndbmtd, mtd, data
+ndb:
+  sidecar:
+    image:
+      repository: db_backup_executor_svc
+      tag: 23.2.0
+      imagePullPolicy: "IfNotPresent"
+    log:
+      level: "WARN"
+    resources:
+      limits:
+        cpu: "100m"
+        memory: "256Mi"
+        ephemeral-storage: "1Gi"
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+        ephemeral-storage: "90Mi"
+  inframonitor:
+    image:
+      name: "db-infra-monitor-svc"
+      repository: db_infra_monitor_svc
+      tag: 23.2.0
+      imagePullPolicy: "IfNotPresent"
+  resources:
+    limits:
+      cpu: 5
+      memory: 24Gi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 5
+      memory: 24Gi
+      ephemeral-storage: 90Mi
+  annotations:
+    - sidecar.istio.io/inject: "true"
+  commonlabels:
+    - nf-vendor: oracle
+    - nf-instance: oc-cndbtier
+    - nf-type: database
+    - component: database
+  anti_pod_affinity:
+    anti_affinity_topologyKey: kubernetes.io/hostname
+    anti_affinity_key: dbtierndbnode
+    anti_affinity_values:
+      - dbtierndbdatanode
+  nodeSelector: []
+
+  use_pod_affinity_rules: false
+  pod_affinity:
+    pod_affinity_topologyKey: failure-domain.beta.kubernetes.io/zone
+    pod_affinity_key: ndbnode
+    pod_affinity_values:
+      - ndbdatanode
+
+  nodeAffinity: 
+    enable: false
+    requiredDuringScheduling:
+      enable: true
+      affinitykeyvalues:
+      - keyname: custom_key
+        keyvalues: 
+        - customvalue1
+        - customvalue2
+    preferredDuringScheduling:
+      enable: false
+      expressions:
+      - weight: 1
+        affinitykeyvalues:
+        - keyname: custom_key
+          keyvalues: 
+          - customvalue1
+          - customvalue2
+
+  service:
+    labels:
+      - app: occne_infra
+      - cis.f5.com/as3-tenant: occne_infra
+      - cis.f5.com/as3-app: svc_occne_infra_sqlnode
+      - cis.f5.com/as3-pool: svc_occne_infra_pool
+  selector:
+    - ndbcontroller.mysql.com/v1alpha1: ndb-ndbmtd
+
+# node aliases: sql, sqld, mysqld, mysql
+api:
+  inframonitor:
+    image:
+      name: "db-infra-monitor-svc"
+      repository: db_infra_monitor_svc
+      tag: 23.2.0
+      imagePullPolicy: "IfNotPresent"
+  resources:
+    limits:
+      cpu: 5
+      memory: 17Gi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 5
+      memory: 17Gi
+      ephemeral-storage: 90Mi
+  egressannotations:
+    - oracle.com.cnc/egress-network: "oam"
+  annotations:
+    - sidecar.istio.io/inject: "true"
+    # - k8s.v1.cni.cncf.io/networks: tag1, tag2, tag3
+  commonlabels:
+    - nf-vendor: oracle
+    - nf-instance: oc-cndbtier
+    - nf-type: database
+    - component: database
+  ndbWaitTimeout: 600
+  waitforndbmtd: true
+
+  # Init container configurations. Used for DB Creation
+  initsidecar:
+    name: init-sidecar
+    image:
+      repository: cndbtier-mysqlndb-client
+      tag: 23.2.0
+      pullPolicy: IfNotPresent
+  initSidecarResources:
+    limits:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 90Mi
+  anti_pod_affinity:
+    anti_affinity_topologyKey: kubernetes.io/hostname
+    anti_affinity_key: dbtierndbnode
+    anti_affinity_values:
+      - dbtierndbsqlnode
+  nodeSelector: []
+  use_pod_affinity_rules: false
+  pod_affinity:
+    pod_affinity_topologyKey: failure-domain.beta.kubernetes.io/zone
+    pod_affinity_key: ndbnode
+    pod_affinity_values:
+      - ndbsqlnode
+
+  nodeAffinity: 
+    enable: false
+    requiredDuringScheduling:
+      enable: true
+      affinitykeyvalues:
+      - keyname: custom_key
+        keyvalues: 
+        - customvalue1
+        - customvalue2
+    preferredDuringScheduling:
+      enable: false
+      expressions:
+      - weight: 1
+        affinitykeyvalues:
+        - keyname: custom_key
+          keyvalues: 
+          - customvalue1
+          - customvalue2
+
+  service:
+    labels:
+      - app: occne_infra
+      - cis.f5.com/as3-tenant: occne_infra
+      - cis.f5.com/as3-app: svc_occne_infra_sqlnode
+      - cis.f5.com/as3-pool: svc_occne_infra_pool
+  # for external geo replication
+  externalService:
+    type: LoadBalancer
+    annotations:
+      metallb.universe.tf/address-pool: oam
+      oracle.com.cnc/app-protocols: '{"tcp":"TCP"}'
+    # Assigning the Labels for Load balancers of sql pods for Geo-Replication
+    # These labels are used for assigning the F5 Load balancer ip address to the
+    # individual Loadbalncer service of each SQL pod.
+    sqlgeorepsvclabels:
+      - name: ndbmysqldsvc-0
+        loadBalancerIP: ""
+        annotations: {}
+        labels:
+          - app: occne_infra
+          - cis.f5.com/as3-tenant: occne_infra
+          - cis.f5.com/as3-app: svc_occne_infra_sqlnode0
+          - cis.f5.com/as3-pool: svc_occne_infra_pool0
+      - name: ndbmysqldsvc-1
+        loadBalancerIP: ""
+        annotations: {}
+        labels:
+          - app: occne_infra
+          - cis.f5.com/as3-tenant: occne_infra
+          - cis.f5.com/as3-app: svc_occne_infra_sqlnode1
+          - cis.f5.com/as3-pool: svc_occne_infra_pool1
+      - name: ndbmysqldsvc-2
+        loadBalancerIP: ""
+        annotations: {}
+        labels:
+          - app: occne_infra
+          - cis.f5.com/as3-tenant: occne_infra
+          - cis.f5.com/as3-app: svc_occne_infra_sqlnode2
+          - cis.f5.com/as3-pool: svc_occne_infra_pool2
+      - name: ndbmysqldsvc-3
+        loadBalancerIP: ""
+        annotations: {}
+        labels:
+          - app: occne_infra
+          - cis.f5.com/as3-tenant: occne_infra
+          - cis.f5.com/as3-app: svc_occne_infra_sqlnode3
+          - cis.f5.com/as3-pool: svc_occne_infra_pool3
+    labels:
+      - app: occne_infra
+      - cis.f5.com/as3-tenant: occne_infra
+      - cis.f5.com/as3-app: svc_occne_infra_sqlnode
+      - cis.f5.com/as3-pool: svc_occne_infra_pool
+  connectivityService:
+    name: mysql-connectivity-service
+    multus:
+      enable: false
+      networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+      networkAttachmentDefinationTagName: ""
+    labels:
+      - app: occne_infra
+      - cis.f5.com/as3-tenant: occne_infra
+      - cis.f5.com/as3-app: svc_occne_infra_sqlnode
+      - cis.f5.com/as3-pool: svc_occne_infra_pool
+    selector:
+      - isNodeForConnectivity: "true"
+  externalconnectivityService:
+    enable: false
+    selector:
+      - isNodeForExternalConnectivity: "false"
+
+  ndbapp:
+    inframonitor:
+      image:
+        name: "db-infra-monitor-svc"
+        repository: db_infra_monitor_svc
+        tag: 23.2.0
+        imagePullPolicy: "IfNotPresent"
+    anti_pod_affinity:
+      anti_affinity_topologyKey: kubernetes.io/hostname
+      anti_affinity_key: dbtierndbnode
+      anti_affinity_values:
+        - dbtierndbappnode
+    nodeSelector: []
+    use_pod_affinity_rules: false
+    pod_affinity:
+      pod_affinity_topologyKey: failure-domain.beta.kubernetes.io/zone
+      pod_affinity_key: ndbnode
+      pod_affinity_values:
+        - ndbappnode
+
+    nodeAffinity: 
+      enable: false
+      requiredDuringScheduling:
+        enable: true
+        affinitykeyvalues:
+        - keyname: custom_key
+          keyvalues: 
+          - customvalue1
+          - customvalue2
+      preferredDuringScheduling:
+        enable: false
+        expressions:
+        - weight: 1
+          affinitykeyvalues:
+          - keyname: custom_key
+            keyvalues: 
+            - customvalue1
+            - customvalue2
+
+    horizontalPodAutoscaler:
+      memory:
+        enabled: true
+        averageUtilization: 80
+      cpu:
+        enabled: false
+        averageUtilization: 80
+
+    resources:
+      limits:
+        cpu: 4
+        memory: 6Gi
+        ephemeral-storage: 1Gi
+      requests:
+        cpu: 4
+        memory: 6Gi
+        ephemeral-storage: 90Mi
+    annotations:
+      - sidecar.istio.io/inject: "true"
+      # - k8s.v1.cni.cncf.io/networks: tag1, tag2, tag3
+    commonlabels:
+      - nf-vendor: oracle
+      - nf-instance: oc-cndbtier
+      - nf-type: database
+      - component: database
+    service:
+      labels:
+        - app: occne_infra
+        - cis.f5.com/as3-tenant: occne_infra
+        - cis.f5.com/as3-app: svc_occne_infra_sqlnode
+        - cis.f5.com/as3-pool: svc_occne_infra_pool
+    connectivityService:
+      name: mysql-connectivity-service
+      labels:
+        - app: occne_infra
+        - cis.f5.com/as3-tenant: occne_infra
+        - cis.f5.com/as3-app: svc_occne_infra_sqlnode
+        - cis.f5.com/as3-pool: svc_occne_infra_pool
+      selector:
+        - isNodeForConnectivity: "true"
+      usendbappselector: true
+      ndbappconnetselector:
+        - ConnectNodeForConnectivity: "ndbapp"
+    externalconnectivityService:
+      enable: false
+      name: mysql-external-connectivity-service
+      type: LoadBalancer
+      loadBalancerIP: ""
+      annotations:
+        metallb.universe.tf/address-pool: oam
+        oracle.com.cnc/app-protocols: '{"tcp":"TCP"}'
+      labels:
+        - app: occne_infra
+        - cis.f5.com/as3-tenant: occne_infra
+        - cis.f5.com/as3-app: svc_occne_infra_external_connect_svc
+        - cis.f5.com/as3-pool: svc_occne_infra_external_connect_pool
+      selector:
+        - isNodeForExternalConnectivity: "true"
+
+# node aliases: sql, sqld, mysqld, mysql
+
+
+
+# Default values for db-replication-svc.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+db-replication-svc:
+  enabled: true
+
+  nodeSelector: []
+
+  nodeAffinity: 
+    enable: false
+    requiredDuringScheduling:
+      enable: true
+      affinitykeyvalues:
+      - keyname: custom_key
+        keyvalues: 
+        - customvalue1
+        - customvalue2
+    preferredDuringScheduling:
+      enable: false
+      expressions:
+      - weight: 1
+        affinitykeyvalues:
+        - keyname: custom_key
+          keyvalues: 
+          - customvalue1
+          - customvalue2
+
+  # If you make this variable value as true then db_replication_svc will setup replication using LoadBalancer CLUSTER-IP
+  # If you make this variable value as false then db_replication_svc will setup replication using LoadBalancer EXTERNAL-IP
+  useClusterIpForReplication: false
+
+  image:
+    repository: db_replication_svc
+    tag: 23.2.0
+    pullPolicy: IfNotPresent
+
+  dbreplsvcdeployments:
+    # if pod prefix is given then use the unique smaller name for this db replication service.
+    - name: cndbtiersitename-cndbtierfirstmatesitename-replication-svc
+      enabled: true
+      multus:
+        enable: false
+        networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+        networkAttachmentDefinationTagName: ""
+      # pod disruption budget for the repl
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+        labels: {}
+      mysql:
+        dbtierservice: "mysql-connectivity-service"
+        dbtierreplservice: "ndbmysqldsvc"
+        # if cndbtier, use CLUSTER-IP from the ndbmysqldsvc-0 LoadBalancer service
+        primaryhost: "ndbmysqld-0.ndbmysqldsvc.occne-cndbtier.svc.cluster.local"
+        port: "3306"
+        # if cndbtier, use EXTERNAL-IP from the ndbmysqldsvc-0 LoadBalancer service
+        primarysignalhost: ""
+        primarysignalhostmultusconfig:
+          multusEnabled: false
+          networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+          networkAttachmentDefinationTagName: ""
+        # serverid is unique; retrieve it for the site being configured
+        primaryhostserverid: "1000"
+        # if cndbtier, use CLUSTER-IP from the ndbmysqldsvc-1 LoadBalancer service
+        secondaryhost: "ndbmysqld-1.ndbmysqldsvc.occne-cndbtier.svc.cluster.local"
+        # if cndbtier, use EXTERNAL-IP from the ndbmysqldsvc-1 LoadBalancer service
+        secondarysignalhost: ""
+        secondarysignalhostmultusconfig:
+          multusEnabled: false
+          networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+          networkAttachmentDefinationTagName: ""
+        # serverid is unique; retrieve it for the site being configured
+        secondaryhostserverid: "1001"
+        skipdrstage:
+          restartsqlnodes: false
+      replication:
+        # Local site replication service LoadBalancer ip can be configured.
+        localsiteip: ""
+        localsiteport: "80"
+        channelgroupid: "1"
+        matesitename: "cndbtierfirstmatesitename"
+        # if cndbtier site1 is installing, use ""
+        # else if cndbtier site2 is installing, use EXTERNAL-IP from site1 ${OCCNE_MATE_SITE_NAME}-${OCCNE_SITE_NAME}-replication-svc LoadBalancer service
+        # else if cndbtier site3 is installing, use EXTERNAL-IP from site1 ${OCCNE_SECOND_MATE_SITE_NAME}-${OCCNE_SITE_NAME}-replication-svc LoadBalancer service
+        # else if cndbtier site4 is installing, use EXTERNAL-IP from site1 ${OCCNE_THIRD_MATE_SITE_NAME}-${OCCNE_SITE_NAME}-replication-svc LoadBalancer service
+        # NOTE: if using and IPv6, enclose IPv6 address in square brackets, like this: "[2606:b400:605:b819:4631:92ff:fe73:9dc1]"
+        remotesiteip: ""
+        remotesiteport: "80"
+      # Name of the pvc which replication service uses for Disaster recovery.
+      # Size of the disksize which is used to store the backup retrieved from the 
+      # remote site and data nodes
+      pvc:
+        name: pvc-cndbtiersitename-cndbtierfirstmatesitename-replication-svc
+        disksize: 44Gi
+      
+      # To provide specific pod label apart from common label
+      # Provide labels in this format Ex:  app-home: cndbtier
+      labels: {}
+      egressannotations:
+        oracle.com.cnc/egress-network: "oam"
+      podAnnotations: {}
+#       k8s.v1.cni.cncf.io/networks: ""
+      schedulertimer: 5000
+      log:
+        level: INFO
+      service:
+        type: LoadBalancer
+        loadBalancerIP: ""
+        port: 80
+        labels:
+          app: occne_infra
+          cis.f5.com/as3-tenant: occne_infra
+          cis.f5.com/as3-app: svc_occne_infra_db_repl_svc_1
+          cis.f5.com/as3-pool: svc_occne_infra_db_repl_svc_pool1
+        annotations:
+          metallb.universe.tf/address-pool: oam
+          oracle.com.cnc/app-protocols: '{"http":"TCP"},{"sftp":"TCP"}'
+    # if pod prefix is given then use the unique smaller name for this db replication service.
+    - name: cndbtiersitename-cndbtiersecondmatesitename-replication-svc
+      enabled: false
+      multus:
+        enable: false
+        networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+        networkAttachmentDefinationTagName: ""
+      # pod disruption budget for the repl
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+        labels: {}
+      mysql:
+        dbtierservice: "mysql-connectivity-service"
+        dbtierreplservice: "ndbmysqldsvc"
+        # if cndbtier, use CLUSTER-IP from the ndbmysqldsvc-2 LoadBalancer service
+        primaryhost: "ndbmysqld-2.ndbmysqldsvc.occne-cndbtier.svc.cluster.local"
+        port: "3306"
+        # if cndbtier, use EXTERNAL-IP from the ndbmysqldsvc-2 LoadBalancer service
+        primarysignalhost: ""
+        primarysignalhostmultusconfig:
+          multusEnabled: false
+          networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+          networkAttachmentDefinationTagName: ""
+        # serverid is unique; retrieve it for the site being configured
+        primaryhostserverid: "1002"
+        # if cndbtier, use CLUSTER-IP from the ndbmysqldsvc-3 LoadBalancer service
+        secondaryhost: "ndbmysqld-3.ndbmysqldsvc.occne-cndbtier.svc.cluster.local"
+        # if cndbtier, use EXTERNAL-IP from the ndbmysqldsvc-3 LoadBalancer service
+        secondarysignalhost: ""
+        secondarysignalhostmultusconfig:
+          multusEnabled: false
+          networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+          networkAttachmentDefinationTagName: ""
+        # serverid is unique; retrieve it for the site being configured
+        secondaryhostserverid: "1003"
+        skipdrstage:
+          restartsqlnodes: false
+      replication:
+        # Local site replication service LoadBalancer ip can be configured.
+        localsiteip: ""
+        localsiteport: "80"
+        channelgroupid: "1"
+        matesitename: "cndbtiersecondmatesitename"
+        # if cndbtier site1 and site2 is installing, use ""
+        # else if cndbtier site3 is installing, use EXTERNAL-IP from site2 ${OCCNE_SECOND_MATE_SITE_NAME}-${OCCNE_SITE_NAME}-replication-svc LoadBalancer service LoadBalancer service
+        # else if cndbtier site4 is installing, use EXTERNAL-IP from site2 ${OCCNE_THIRD_MATE_SITE_NAME}-${OCCNE_SITE_NAME}-replication-svc LoadBalancer service LoadBalancer service
+        # NOTE: if using and IPv6, enclose IPv6 address in square brackets, like this: "[2606:b400:605:b819:4631:92ff:fe73:9dc1]"
+        remotesiteip: ""
+        remotesiteport: "80"
+      labels: {}
+      egressannotations:
+        oracle.com.cnc/egress-network: "oam"
+      podAnnotations: {}
+      schedulertimer: 5000
+      log:
+        level: INFO
+      service:
+        type: LoadBalancer
+        loadBalancerIP: ""
+        port: 80
+        labels:
+          app: occne_infra
+          cis.f5.com/as3-tenant: occne_infra
+          cis.f5.com/as3-app: svc_occne_infra_db_repl_svc_2
+          cis.f5.com/as3-pool: svc_occne_infra_db_repl_svc_pool2
+        annotations:
+          metallb.universe.tf/address-pool: oam
+          oracle.com.cnc/app-protocols: '{"http":"TCP"},{"sftp":"TCP"}'
+    # if pod prefix is given then use the unique smaller name for this db replication service.
+    - name: cndbtiersitename-<${OCCNE_THIRD_MATE_SITE_NAME}>-replication-svc
+      enabled: 
+      multus:
+        enable: false
+        networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+        networkAttachmentDefinationTagName: ""
+      # pod disruption budget for the repl
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+        labels: {}
+      mysql:
+        dbtierservice: "mysql-connectivity-service"
+        dbtierreplservice: "ndbmysqldsvc"
+        # if cndbtier, use CLUSTER-IP from the ndbmysqldsvc-4 LoadBalancer service
+        primaryhost: "ndbmysqld-4.ndbmysqldsvc.occne-cndbtier.svc.cluster.local"
+        port: "3306"
+        # if cndbtier, use EXTERNAL-IP from the ndbmysqldsvc-4 LoadBalancer service
+        primarysignalhost: ""
+        primarysignalhostmultusconfig:
+          multusEnabled: false
+          networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+          networkAttachmentDefinationTagName: ""
+        # serverid is unique; retrieve it for the site being configured
+        primaryhostserverid: "1004"
+        # if cndbtier, use CLUSTER-IP from the ndbmysqldsvc-5 LoadBalancer service
+        secondaryhost: "ndbmysqld-5.ndbmysqldsvc.occne-cndbtier.svc.cluster.local"
+        # if cndbtier, use EXTERNAL-IP from the ndbmysqldsvc-5 LoadBalancer service
+        secondarysignalhost: ""
+        secondarysignalhostmultusconfig:
+          multusEnabled: false
+          networkAttachmentDefinationApiName: "k8s.v1.cni.cncf.io"
+          networkAttachmentDefinationTagName: ""
+        # serverid is unique; retrieve it for the site being configured
+        secondaryhostserverid: "1005"
+        skipdrstage:
+          restartsqlnodes: false
+      replication:
+        # Local site replication service LoadBalancer ip can be configured.
+        localsiteip: ""
+        localsiteport: "80"
+        channelgroupid: "1"
+        matesitename: "<${OCCNE_THIRD_MATE_SITE_NAME}>"
+        # if cndbtier site1, site2 and site3 is installing, use ""
+        # else if cndbtier site4 is installing, use EXTERNAL-IP from site3 ${OCCNE_THIRD_MATE_SITE_NAME}-${OCCNE_SITE_NAME}-replication-svc LoadBalancer service LoadBalancer service
+        # NOTE: if using and IPv6, enclose IPv6 address in square brackets, like this: "[2606:b400:605:b819:4631:92ff:fe73:9dc1]"
+        remotesiteip: ""
+        remotesiteport: "80"
+      labels: {}
+      egressannotations:
+        oracle.com.cnc/egress-network: "oam"
+      podAnnotations: {}
+      schedulertimer: 5000
+      log:
+        level: INFO
+      service:
+        type: LoadBalancer
+        loadBalancerIP: ""
+        port: 80
+        labels:
+          app: occne_infra
+          cis.f5.com/as3-tenant: occne_infra
+          cis.f5.com/as3-app: svc_occne_infra_db_repl_svc_3
+          cis.f5.com/as3-pool: svc_occne_infra_db_repl_svc_pool3
+        annotations:
+          metallb.universe.tf/address-pool: oam
+          oracle.com.cnc/app-protocols: '{"http":"TCP"},{"sftp":"TCP"}'
+
+  grrecoveryresources:
+    limits:
+      cpu: 2
+      memory: 12Gi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 2
+      memory: 12Gi
+      ephemeral-storage: 90Mi
+
+  resources:
+    limits:
+      cpu: 1
+      memory: 2048Mi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 0.6
+      memory: 1024Mi
+      ephemeral-storage: 90Mi
+
+  proxy:
+    host: ""
+    port: ""
+
+  # Init container configurations. Used for DB Creation
+  initcontainer:
+    image:
+      repository: cndbtier-mysqlndb-client
+      tag: 23.2.0
+      pullPolicy: IfNotPresent
+
+
+  InitContainersResources:
+    limits:
+      cpu: 0.2
+      memory: 500Mi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 0.2
+      memory: 500Mi
+      ephemeral-storage: 90Mi
+
+  enableInitContainerForIpDiscovery: false
+# Default values for db-monitor-svc.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+db-monitor-svc:
+
+  nodeSelector: []
+  schedulertimer: 5000
+  binlogthreadstore:
+    capacity: 5
+  
+  # Interval time in milisecs when monitor svc is 
+  # going to fetch metrics for prometheus
+  metricsFetchSchedulerTimer: 55000
+    
+  image:
+    repository: db_monitor_svc
+    tag: 23.2.0
+    pullPolicy: IfNotPresent
+
+  nodeAffinity: 
+    enable: false
+    requiredDuringScheduling:
+      enable: true
+      affinitykeyvalues:
+      - keyname: custom_key
+        keyvalues: 
+        - customvalue1
+        - customvalue2
+    preferredDuringScheduling:
+      enable: false
+      expressions:
+      - weight: 1
+        affinitykeyvalues:
+        - keyname: custom_key
+          keyvalues: 
+          - customvalue1
+          - customvalue2
+
+  mysql:
+    primaryhost: "ndbmysqld-0.ndbmysqldsvc.occne-cndbtier.svc.cluster.local"
+    # if cndbtier, use EXTERNAL-IP from the ndbmysqldsvc-0 LoadBalancer service
+    primarysignalhost: ""
+    secondaryhost: "ndbmysqld-1.ndbmysqldsvc.occne-cndbtier.svc.cluster.local"
+    # if cndbtier, use EXTERNAL-IP from the ndbmysqldsvc-1 LoadBalancer service
+    secondarysignalhost: ""
+
+
+# To provide specific pod label apart from common label
+# Provide labels in this format, Ex: cis.f5.com/as3-tenant: occne_infra 
+  labels: {}
+
+  podAnnotations:
+    oracle.com/cnc: "true"
+
+  service:
+    labels: {}
+    annotations: {}
+
+  resources:
+    limits:
+      cpu: 0.2
+      memory: 500Mi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 0.2
+      memory: 500Mi
+      ephemeral-storage: 90Mi
+
+  log:
+    level: WARN
+  
+  restartSQLNodesIfBinlogThreadStalled: true
+
+
+# Default values for db-backup-manager-svc.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+db-backup-manager-svc:
+  nodeSelector: []
+  scheduler:
+    # Cron job expression for routine backup
+    cronjobExpression: "0 0 */7 * *"
+  securityContext: {}
+  
+  deletePurgedRecords:
+    enabled: true 
+    # interval in number of days after which purged backup records will be cleared from table 
+    schedulerInterval: 1
+    # DB records for no of days = retainPurgedBackupForDays will be retained and remaining will be cleared
+    retainPurgedBackupForDays: 30
+  # Defines how much retry the backup manager svc will do to check
+  # executor svc status from the database and the time gap between 
+  # each retry(in seconds). 
+  executor_status_verify_retry:
+    count: 360
+    gap: 10
+
+  nodeAffinity: 
+    enable: false
+    requiredDuringScheduling:
+      enable: true
+      affinitykeyvalues:
+         - keyname: custom_key
+           keyvalues: 
+           - customvalue1
+           - customvalue2
+    preferredDuringScheduling:
+      enable: false
+      expressions:
+      - weight: 1
+        affinitykeyvalues:
+        - keyname: custom_key
+          keyvalues: 
+          - customvalue1
+          - customvalue2
+    
+  pod:
+    annotations: {}
+    labels: {}
+  image:
+    repository: db_backup_manager_svc
+    tag: 23.2.0
+    pullPolicy: IfNotPresent
+  ndb:
+    retainbackupno: 3
+    maxretryno: 30
+    retryinterval: 600
+  log:
+    level: INFO
+  resources:
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+      ephemeral-storage: "1Gi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+      ephemeral-storage: "90Mi"
+
+  priorityClassName: ""
+
+
+  service:
+    labels: {}
+    annotations: {}
+
+# This isn't a chart but a helm hook
+postInstallJob:
+  image:
+    repository: cndbtier-mysqlndb-client
+    tag: 23.2.0
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 90Mi
+# This isn't a chart but a helm hook
+preUpgradeJob:
+  image:
+    repository: cndbtier-mysqlndb-client
+    tag: 23.2.0
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 90Mi
+# This isn't a chart but a helm hook
+postUpgradeJob:
+  image:
+    repository: cndbtier-mysqlndb-client
+    tag: 23.2.0
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 90Mi
+# This isn't a chart but a helm hook
+postRollbackJob:
+  image:
+    repository: cndbtier-mysqlndb-client
+    tag: 23.2.0
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 90Mi
+
+test:
+  image:
+    repository: cndbtier-mysqlndb-client
+    tag: 23.2.0
+    pullPolicy: IfNotPresent
+  annotations:
+    - sidecar.istio.io/inject: "true"
+  statusCheck:
+    replication:
+      enable: true
+    monitor:
+      enable: true
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 1Gi
+    requests:
+      cpu: 0.1
+      memory: 256Mi
+      ephemeral-storage: 90Mi

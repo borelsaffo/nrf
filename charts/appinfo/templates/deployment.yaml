@@ -1,0 +1,191 @@
+{{- if $.Values.global.appinfoServiceEnable }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "appinfo-deployment-name" . }}
+  labels:
+    {{- include "labels.nonlbDeployments" . }}
+    app: {{ template "appinfo-deployment-name" . }}
+  annotations:
+    {{- include "annotations.nonlbDeployments" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ template "appinfo-deployment-name" . }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: {{ .Values.maxUnavailable }}
+  template:
+    metadata:
+      labels:
+        {{- include "labels.nonlbDeployments" . | indent 4 }}
+        app: {{ template "appinfo-deployment-name" . }}
+      annotations:
+        {{- include "annotations.nonlbDeployments" . | indent 4 }}
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: {{ .Values.global.containerPorts.monitoringHttp | quote }}
+        prometheus.io/scrape: "true"
+    spec:
+      terminationGracePeriodSeconds: {{ template "termination-grace-period-seconds" .}}
+      tolerations: {{ include "ocnf.tolerations" . | nindent 6 }}
+      nodeSelector: {{ include "ocnf.nodeselector" . | nindent 8 }}
+      volumes:
+    {{- include "extraVolumes" . | nindent 6 }}
+      - name: conf
+        configMap:
+          name: {{ template "appinfo-deployment-name" . }}
+      - emptyDir: {}
+        name: tmp
+      containers:
+      - env:
+        - name: NF_INSTANCE_ID
+          value: {{ .Values.global.nfInstanceId | quote }}
+        - name: METRIC_PREFIX
+          value: {{ .Values.global.metricPrefix | quote }}
+        - name: METRIC_SUFFIX
+          value: {{ .Values.global.metricSuffix | quote }}
+        - name: TAG_NAMESPACE
+          value: {{ .Values.tagNamespace | quote }}
+        - name: COMMON_CFG_CLIENT_ENABLED
+          value: {{ .Values.commonCfgClient.enabled | quote }}
+        - name: COMMON_CFG_SERVER_HOST
+          value: {{ template "service.ConfigServerSvcFullname" .}}
+        - name: COMMON_CFG_SERVER_PORT
+          value: {{ .Values.commonCfgServer.port | quote }}
+        - name: NF_TYPE
+          value: {{ .Values.global.nfType }}
+        - name: OPERATIONAL_STATE_RESOURCE_PATH
+          value: {{ .Values.controlled_shutdown.operationlStateResourcePath }}
+        - name: CONTROLLED_SHUTDOWN_ENABLED
+          value: {{ .Values.global.enableControlledShutdown | quote }}
+        - name: COMMON_CFG_SERVER_POLLING_INTERVAL
+          value: {{ .Values.commonCfgServer.pollingInterval | quote }}
+        - name: CONNECTION_TIMEOUT
+          value: {{ .Values.commonCfgServer.connectionTimeout | quote}}
+        - name: COMMONSERVICE_NAME
+          value: {{ .Values.commonServiceName }}
+        - name: ISTIO_SIDECAR_QUIT_URL
+          value: {{ template "istioproxy.quit.url" . }}
+        - name: ISTIO_SIDECAR_READY_URL
+          value: {{ template "istioproxy.ready.url" . }}
+        - name: SERVICE_MESH_CHECK
+          value: {{ template "servicemesh.check" . }}         
+        - name: RELEASE_VERSION
+          value: {{ template "appinfo.hook.chartVersion" .}}
+        - name: LOG_LEVEL_APPINFO
+          value: {{ .Values.log.level.appinfo }}
+        - name: CONFIG_FILE
+          value: /etc/appinfo.yaml
+        - name: MONITORING_PORT
+          value: {{ .Values.global.containerPorts.monitoringHttp | quote }}
+        - name: SIGNALING_PORT
+          value: {{ .Values.global.containerPorts.appInfoHttp | quote }}
+        - name: PROBE_VALIDATION_BYPASS
+          value: {{ .Values.probeValidationByPass.enabled | quote }}
+        - name: GUNICORN_TIMEOUT
+          value: {{ .Values.gunicornTimeout | quote }}
+        - name: PERFINFO_ENABLED
+          value: {{ .Values.global.performanceServiceEnable | quote}}
+        {{- if $.Values.global.performanceServiceEnable }}
+        - name: PERFINFO_HOST
+          value: {{ template "service-name-perf-info" .}}
+        - name: PERFINFO_PORT
+          value: {{ .Values.perfinfo.port | quote }}
+        {{- end }}
+        - name: APP_SHUTDOWN_GRACE_PERIOD
+          value: {{ include "termination-grace-period-seconds" . | quote }}
+        - name: APP_GRACEFUL_SHUTDOWN_ERROR_CODE
+          value: {{ .Values.gracefulShutdown.defaultErrorCode | quote }}
+        - name: MULTIPLE_IGW_ENABLED
+          value: {{ .Values.global.multipleIgwEnabled  | quote }}
+        {{- if .Values.imageTag }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image }}:{{ .Values.imageTag }}"
+        {{- else }}
+        image: "{{ .Values.global.dockerRegistry }}/{{ .Values.image }}:{{ .Values.global.imageTag }}"
+        {{- end }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        name: {{ printf "%s-%s-%s" (include "getprefix" .) "appinfo" (include "getsuffix" .) | trunc 63 | trimPrefix "-"|trimSuffix "-"  }}
+        volumeMounts:
+        - name: conf
+          mountPath: /etc/appinfo.yaml
+          subPath: appinfo.yaml
+        - mountPath: /tmp
+          name: tmp
+        ports:
+          - containerPort: {{ .Values.global.containerPorts.appInfoHttp }}
+            name: http-signaling
+          - name: {{ .Values.global.cncMetricsName }}
+            containerPort: {{ .Values.global.containerPorts.monitoringHttp }}
+            protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /v1/liveness
+            port: {{ .Values.global.containerPorts.monitoringHttp }}
+            scheme: HTTP
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/startup
+            port: {{ .Values.global.containerPorts.monitoringHttp }}
+            scheme: HTTP
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        {{- if and (ge .Capabilities.KubeVersion.Major "1") (ge .Capabilities.KubeVersion.Minor "20") }}
+        startupProbe:
+          httpGet:
+            path: /actuator/health/startup
+            port: {{ .Values.global.containerPorts.monitoringHttp }}
+            scheme: HTTP
+          initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.startupProbe.successThreshold }}
+          failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+        {{- end }}
+        resources:
+          limits:
+            {{- if ne (add .Values.global.logStorage .Values.global.crictlStorage)  0 }}
+            ephemeral-storage: {{ .Values.resources.limits.ephemeralStorage | quote }}
+            {{- end }}
+            cpu: {{ .Values.resources.limits.cpu | quote}}
+            memory: {{ .Values.resources.limits.memory | quote}}
+          requests:
+            {{- if ne (add .Values.global.logStorage .Values.global.crictlStorage)  0 }}
+            ephemeral-storage: {{ template "app_info-ephemeral-storage-request" .}}
+            {{- end }}
+            cpu: {{ .Values.resources.requests.cpu | quote}}
+            memory: {{ .Values.resources.requests.memory | quote}}
+    {{- include "extraContainers" . | nindent 6}}
+      {{- if $.Values.global.serviceAccountName }}
+      serviceAccountName: {{ .Values.global.serviceAccountName }}
+      {{- else }}
+      serviceAccountName: {{ template "appinfo-deployment-name" . }}
+      {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100 
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: "app.kubernetes.io/name"
+                  operator: In
+                  values:
+                  - {{ template "chart.fullname" .}} 
+              topologyKey: "kubernetes.io/hostname"
+
+  {{- end }}

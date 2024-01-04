@@ -1,0 +1,5 @@
+apiVersion: v2
+appVersion: 23.2.0
+description: Oracle Communications NRF NF Subscription microservice
+name: nfsubscription
+version: 23.2.0

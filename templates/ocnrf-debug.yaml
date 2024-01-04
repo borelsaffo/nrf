@@ -1,0 +1,83 @@
+{{- if not  .Values.global.serviceAccountName }}
+{{ $ingressDebugContainer := index .Values "ingress-gateway" "extraContainers" }}
+{{ $egressDebugContainer := index .Values "egress-gateway" "extraContainers" }}
+{{- if or (eq .Values.global.extraContainers "ENABLED") (eq $ingressDebugContainer "ENABLED") (eq $egressDebugContainer "ENABLED") (eq .Values.nfregistration.extraContainers "ENABLED") (eq .Values.nfsubscription.extraContainers "ENABLED") (eq .Values.nrfauditor.extraContainers "ENABLED") (eq .Values.nfdiscovery.extraContainers "ENABLED") (eq .Values.nrfconfiguration.extraContainers "ENABLED") (eq .Values.nfaccesstoken.extraContainers "ENABLED") (eq .Values.appinfo.extraContainers "ENABLED")}}
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ template "ocnrf.debug.psp" .}}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+spec:
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: true
+  allowedCapabilities:
+  - NET_ADMIN
+  - NET_RAW
+  fsGroup:
+    ranges:
+    - max: 65535
+      min: 1
+    rule: MustRunAs
+  runAsUser:
+    rule: MustRunAsNonRoot
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - persistentVolumeClaim
+  - projected
+  - secret
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "ocnrf.debug.role" .}}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+rules:
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+  resourceNames:
+  - {{ template "ocnrf.debug.psp" .}}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "ocnrf.debug.rolebinding" .}}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "labels.allResources" . }}
+    app.kubernetes.io/component: internal
+  annotations:
+    {{- include "annotations.allResources" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ template "ocnrf.debug.role" .}}
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: system:serviceaccounts
+- kind: ServiceAccount
+  name: {{ template "ocnrf.serviceaccount" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- end }}

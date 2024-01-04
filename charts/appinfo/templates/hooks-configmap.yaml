@@ -1,0 +1,42 @@
+{{- if and .Values.commonCfgClient.enabled .Values.global.appinfoServiceEnable }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-hook-configmap-appinfo
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,pre-rollback,pre-delete,post-upgrade,post-rollback
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  defaultconfig.yaml: |-
+    {{ include "appinfo.defaultconfig.labels" . | quote }}
+  defaultschema.json: |-
+{{ .Files.Get "defaultschema.json" | indent 4}}
+{{- end }}
+---
+{{- if .Values.global.hookValidation.infraValidate }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-hook-configmap-infra-check
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-1001"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  appinfo.yaml: |
+    # The namespace in which all the services run
+    watch_namespace: {{ .Values.app.namespace | default .Release.Namespace }}
+    watch_mysql: {{ .Values.watchMySQL }}
+    db_status_uri: {{ .Values.dbStatusUri }}
+    prometheus_url: {{ .Values.prometheusUrl }}
+    alertmanager_url: {{ .Values.alertmanagerUrl }}
+    realtime_db_status_uri: {{ .Values.realtimeDbStatusUri }}
+    replication_status_uri: {{ .Values.replicationUri }}
+    replication_status_interval : {{ .Values.replicationInterval }}
+    scrape_interval: {{ .Values.scrapeInterval }}
+  minViablePath: {{ .Values.minViablePath | quote }}
+  minKubernetesVersion: {{ .Values.minKubernetesVersion | quote }}
+  minDbTierVersion: {{ .Values.minDbTierVersion | quote }}
+{{- end }}
+
